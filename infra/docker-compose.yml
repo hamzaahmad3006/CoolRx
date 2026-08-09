@@ -1,0 +1,97 @@
+# Local development dependencies.
+#
+# Stateful services only. The API, worker and web app run on the host so the
+# edit-reload loop stays fast — containerising them locally would slow iteration
+# for no benefit (SRS §24.2).
+#
+#   docker compose -f infra/docker-compose.yml up -d
+#
+# On Windows the `api` profile is the recommended way to run the backend, because
+# the geospatial stack (GDAL, GEOS, PROJ) is painful to build against native
+# Windows Python:
+#
+#   docker compose -f infra/docker-compose.yml --profile api up
+
+name: coolrx
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: coolrx-db
+    environment:
+      POSTGRES_USER: coolrx
+      POSTGRES_PASSWORD: coolrx
+      POSTGRES_DB: coolrx
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U coolrx -d coolrx"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: coolrx-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ── Opt-in: run the API in Docker instead of on the host ─────────────────
+  api:
+    profiles: ["api"]
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: coolrx-api
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://coolrx:coolrx@db:5432/coolrx
+      REDIS_URL: redis://redis:6379/0
+      FIXTURE_MODE: "true"
+      LOG_FORMAT: console
+      CORS_ALLOWED_ORIGINS: http://localhost:3000
+    ports:
+      - "8000:8000"
+    volumes:
+      # Bind-mounted for reload; models and fixtures come from the repo.
+      - ../backend:/app
+    command:
+      ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+  worker:
+    profiles: ["api"]
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: coolrx-worker
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://coolrx:coolrx@db:5432/coolrx
+      REDIS_URL: redis://redis:6379/0
+      FIXTURE_MODE: "true"
+      LOG_FORMAT: console
+    volumes:
+      - ../backend:/app
+    command: ["rq", "worker", "--url", "redis://redis:6379/0", "coolrx"]
+
+volumes:
+  pgdata:
+  redisdata:

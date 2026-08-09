@@ -1,0 +1,51 @@
+# ── Node / Next.js ──────────────────────────────────────────────────────────
+node_modules/
+.next/
+out/
+build/
+.vercel/
+*.tsbuildinfo
+next-env.d.ts
+
+# ── Python ──────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.venv-*/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ── Secrets — never commit ──────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# ── Large geospatial rasters (fetched by `make data`, never committed) ──────
+backend/data/raw/
+*.tif
+*.tiff
+*.img
+*.zip
+
+# ── Generated artifacts ─────────────────────────────────────────────────────
+backend/var/
+backend/var/reports/
+*.pdf
+!docs/**/*.pdf
+
+# ── OS / editor ─────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# ── Logs ────────────────────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+yarn-error.log*

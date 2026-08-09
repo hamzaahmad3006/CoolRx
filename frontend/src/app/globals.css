@@ -1,0 +1,214 @@
+@import "tailwindcss";
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CoolRx design tokens — Tailwind v4 (CSS-first).
+
+   Google Stitch emitted a Tailwind v3 `tailwind.config` JS object. This project
+   runs Tailwind v4, which has no JS config — tokens are CSS custom properties
+   inside @theme. Every value below mirrors `src/constants/`; keep the two in
+   sync. `src/constants/` is authoritative for TypeScript, this file is
+   authoritative for utility classes.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@theme {
+  /* ── Surfaces & text ───────────────────────────────────────────────────── */
+  --color-canvas:            #f7f7f5;
+  --color-card:              #ffffff;
+  --color-subtle:            #f0f0ee;
+  --color-inset:             #efedf0;
+  --color-line:              #e2e1dc;
+  --color-line-strong:       #17181a;
+  --color-inverse:           #17181a;
+  --color-on-inverse:        #f2f0f3;
+
+  --color-ink:               #17181a;
+  --color-ink-secondary:     #42474c;
+  --color-ink-muted:         #73787d;
+  --color-on-accent:         #ffffff;
+
+  /* ── Interactive accent — controls and links only, never data ─────────── */
+  --color-accent:            #2b4a61;
+  --color-accent-hover:      #1f3849;
+  --color-accent-strong:     #123349;
+  --color-accent-subtle:     #edf1f4;
+
+  /* ── Semantic — status only, never data ───────────────────────────────── */
+  --color-danger:            #a3231f;
+  --color-danger-bg:         #fbedec;
+  --color-danger-line:       #efc9c6;
+  --color-caution:           #b4690e;
+  --color-caution-bg:        #fdf3e3;
+  --color-caution-line:      #f0dcb4;
+  --color-verified:          #2e6b4f;
+  --color-verified-bg:       #ebf3ee;
+  --color-verified-line:     #c9ded2;
+
+  /* ── Typography ───────────────────────────────────────────────────────── */
+  --font-sans:   var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono:   var(--font-jetbrains-mono), ui-monospace, monospace;
+  --font-serif:  var(--font-source-serif), Georgia, serif;
+
+  /* Exactly five UI sizes (SRS §28.3) plus the report body. Do not add more. */
+  --text-eyebrow:            0.75rem;   /* 12px */
+  --text-eyebrow--line-height: 1rem;
+  --text-eyebrow--letter-spacing: 0.08em;
+  --text-eyebrow--font-weight: 600;
+
+  --text-caption:            0.8125rem; /* 13px */
+  --text-caption--line-height: 1.125rem;
+
+  --text-body:               0.9375rem; /* 15px — BASE */
+  --text-body--line-height:  1.375rem;
+
+  --text-heading:            1.25rem;   /* 20px */
+  --text-heading--line-height: 1.75rem;
+  --text-heading--letter-spacing: -0.01em;
+  --text-heading--font-weight: 600;
+
+  --text-title:              1.75rem;   /* 28px */
+  --text-title--line-height: 2.25rem;
+  --text-title--letter-spacing: -0.02em;
+  --text-title--font-weight: 600;
+
+  --text-report:             1rem;      /* 16px — serif, PDF/report only */
+  --text-report--line-height: 1.5rem;
+
+  /* ── Radius — "technical-sharp". 4px everywhere, no exceptions. ───────── */
+  --radius-sharp:            0.25rem;
+
+  /* ── Spacing — 4px baseline ───────────────────────────────────────────── */
+  --spacing-card:            1.25rem;   /* 20px card padding */
+  --spacing-gutter:          1rem;      /* 16px */
+  --spacing-rail:            13.75rem;  /* 220px left rail */
+  --spacing-panel:           23.75rem;  /* 380px right panel */
+  --spacing-topbar:          3.5rem;    /* 56px */
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DATA-VISUALISATION SCALES — `@theme static`, deliberately.
+
+   Tailwind v4 tree-shakes theme variables that no utility class references.
+   These ramps are applied programmatically — MapLibre paint expressions,
+   Recharts fills, legend gradients — from the `COLORS` constants in
+   `src/constants/colors.ts`, so Tailwind never sees a `bg-heat-4` class and
+   would drop the variables entirely. `static` forces emission so both access
+   paths work: the TypeScript constant AND `var(--color-heat-4)` in CSS.
+
+   Values must stay identical to `src/constants/colors.ts`.
+   ═══════════════════════════════════════════════════════════════════════════ */
+@theme static {
+  /* Heat scale — magma family, perceptually uniform, colour-blind safe. */
+  --color-heat-1:            #fcfdbf;
+  --color-heat-2:            #fec98d;
+  --color-heat-3:            #fd9668;
+  --color-heat-4:            #f1605d;
+  --color-heat-5:            #b63679;
+  --color-heat-6:            #721f81;
+  --color-heat-7:            #2d1160;
+
+  /* Cooling scale (ΔT) — diverging, zero-centred, distinct hue family. */
+  --color-cool-3:            #0e7c86;
+  --color-cool-2:            #6fb7bd;
+  --color-cool-0:            #e8e6df;
+  --color-warm-2:            #e0b278;
+  --color-warm-3:            #b5651d;
+
+  /* Intervention categories — plan tables, legends and site markers only. */
+  --color-iv-water:          #3e7ca6;
+  --color-iv-green:          #5c8a4a;
+  --color-iv-shade:          #7a6ea3;
+  --color-iv-material:       #a8814e;
+
+  /* Risk levels — always paired with an icon and a word, never colour alone. */
+  --color-risk-low:          #4c7a5d;
+  --color-risk-moderate:     #b4890e;
+  --color-risk-high:         #c1611f;
+  --color-risk-extreme:      #9b2c2c;
+
+  /* Map chrome. */
+  --color-map-street:        #d8d7d2;
+  --color-map-selection:     #17181a;
+  --color-map-control:       #8a8d91;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Dark theme. Data scales stay identical across themes on purpose — a
+   screenshot must mean the same thing in either mode.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.dark {
+  --color-canvas:            #121316;
+  --color-card:              #1b1d21;
+  --color-subtle:            #22252a;
+  --color-inset:             #1f2226;
+  --color-line:              #2c2f34;
+  --color-ink:               #ededea;
+  --color-ink-secondary:     #a2a6ac;
+  --color-ink-muted:         #7c8188;
+  --color-accent-subtle:     #1c2b36;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Base
+   ═══════════════════════════════════════════════════════════════════════════ */
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: var(--text-body--line-height);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Every numeral in the product aligns in columns. Non-tabular figures in a
+     data table are the fastest way to look unprofessional (SRS §28.3). */
+  table,
+  [data-numeric],
+  .font-mono {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
+
+  /* Visible focus on everything. Never `outline: none` without a replacement. */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+
+  /* Motion is functional only (SRS §28.1). */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer utilities {
+  /* Hairline hierarchy instead of elevation. */
+  .surface-card {
+    background-color: var(--color-card);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-sharp);
+  }
+
+  /* Control-tile hatch for the verification map. */
+  .hatch-control {
+    background-image: repeating-linear-gradient(
+      45deg,
+      var(--color-map-control) 0,
+      var(--color-map-control) 1px,
+      transparent 1px,
+      transparent 6px
+    );
+  }
+}
