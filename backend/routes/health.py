@@ -15,6 +15,8 @@ from fastapi import APIRouter, Depends, Response, status
 from pydantic import BaseModel
 
 from core.config import Settings, get_settings
+from repositories.base import check_connectivity, postgis_available, session_scope
+from repositories.catalog import CatalogError, assert_catalog_ready
 
 router = APIRouter(tags=["system"])
 
@@ -44,13 +46,15 @@ class ReadinessResponse(BaseModel):
 
 @router.get("/health", response_model=HealthResponse, summary="Liveness")
 def health(settings: SettingsDep) -> HealthResponse:
+    database: DependencyState = "ok" if check_connectivity() else "down"
     return HealthResponse(
-        status="ok",
+        status="ok" if database == "ok" else "degraded",
         version=settings.app_version,
         mode="fixture" if settings.fixture_mode else "live",
         model_version=settings.model_version,
         dependencies={
-            "database": "skipped",
+            "database": database,
+            # Not probed here: liveness must stay cheap. Readiness probes them.
             "redis": "skipped",
             "fortyguard": "skipped" if settings.fixture_mode else "ok",
         },
@@ -84,16 +88,52 @@ def readiness(settings: SettingsDep, response: Response) -> ReadinessResponse:
             )
         )
 
-    # Intervention catalog — every entry must carry a source citation. The app
-    # deliberately refuses to serve with an uncited unit cost.
-    catalog = Path("data/interventions.yaml")
+    # Database and PostGIS — the catalog check below needs both, so they are
+    # reported separately to make the cause of a failure unambiguous.
+    database_up = check_connectivity()
     checks.append(
         ReadinessCheck(
-            name="intervention_catalog",
-            state="ok" if catalog.is_file() else "down",
-            detail=None if catalog.is_file() else "data/interventions.yaml not found",
+            name="database",
+            state="ok" if database_up else "down",
+            detail=None if database_up else "Cannot connect to PostgreSQL",
         )
     )
+
+    if database_up:
+        postgis = postgis_available()
+        checks.append(
+            ReadinessCheck(
+                name="postgis",
+                state="ok" if postgis else "down",
+                detail=None if postgis else "PostGIS extension not installed",
+            )
+        )
+
+    # Intervention catalog — every entry must carry a source citation. The app
+    # deliberately refuses to serve with an uncited unit cost (AC-23).
+    #
+    # Checked against the database, not the CSV: the database is what the
+    # optimizer reads, so a valid CSV that was never loaded must still fail.
+    if database_up:
+        try:
+            with session_scope() as session:
+                rows = assert_catalog_ready(session)
+            catalog_check = ReadinessCheck(
+                name="intervention_catalog",
+                state="ok",
+                detail=f"{rows} cited entries",
+            )
+        except CatalogError as exc:
+            catalog_check = ReadinessCheck(
+                name="intervention_catalog", state="down", detail=str(exc)
+            )
+    else:
+        catalog_check = ReadinessCheck(
+            name="intervention_catalog",
+            state="down",
+            detail="Not verifiable — database unavailable",
+        )
+    checks.append(catalog_check)
 
     ready = all(check.state != "down" for check in checks)
     if not ready:

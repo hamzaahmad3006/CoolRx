@@ -18,6 +18,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from core.config import Settings, get_settings
 from middleware.correlation import CorrelationIdMiddleware
+from repositories.base import check_connectivity, postgis_available, session_scope
+from repositories.catalog import CatalogError, assert_catalog_ready
 from routes import health
 
 log = structlog.get_logger(__name__)
@@ -79,6 +81,48 @@ def _redact_secrets(
     return event_dict
 
 
+def _check_catalog_at_startup(settings: Settings) -> None:
+    """AC-23: refuse to serve an uncited intervention catalog.
+
+    Two failure modes are deliberately treated differently:
+
+    * **Database unreachable** — logged, not fatal. Crashing here turns a
+      recoverable dependency outage into a container crash-loop; the readiness
+      probe reports it and the orchestrator withholds traffic, which is the
+      behaviour we want.
+    * **Catalog present but invalid** — fatal. This is a data defect that will
+      not fix itself, and the consequence is an unsourced cost figure in a
+      report a city acts on.
+    """
+    if not check_connectivity():
+        log.error(
+            "startup.database_unreachable",
+            detail=(
+                "Catalog gate skipped — the readiness probe will report not-ready "
+                "until the database is available."
+            ),
+        )
+        return
+
+    if not postgis_available():
+        log.error(
+            "startup.postgis_missing",
+            detail="PostGIS extension is not installed; spatial queries will fail.",
+        )
+
+    try:
+        with session_scope() as session:
+            rows = assert_catalog_ready(session)
+    except CatalogError as exc:
+        if settings.catalog_strict:
+            # Raising inside lifespan aborts startup, which is the intent.
+            raise RuntimeError(f"startup aborted: {exc}") from exc
+        log.warning("startup.catalog_invalid_permitted", detail=str(exc))
+        return
+
+    log.info("startup.catalog_ready", rows=rows)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
@@ -96,6 +140,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             "app.fixture_mode",
             detail="Serving committed fixtures — no live FortyGuard calls.",
         )
+
+    # A relaxed catalog gate in production defeats AC-23 entirely, so the
+    # combination is rejected rather than warned about.
+    if settings.app_env == "production" and not settings.catalog_strict:
+        raise RuntimeError(
+            "CATALOG_STRICT=false is not permitted in production (AC-23)."
+        )
+
+    _check_catalog_at_startup(settings)
+
     yield
     log.info("app.shutdown")
 

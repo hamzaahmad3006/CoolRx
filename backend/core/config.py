@@ -44,6 +44,16 @@ class Settings(BaseSettings):
     database_pool_size: int = 5
     database_max_overflow: int = 5
 
+    # ── Intervention catalog ─────────────────────────────────────────────────
+    #: CSV the catalog is loaded from. Its cost and effect-size values must come
+    #: from published sources; see data/interventions_catalog.csv for the contract.
+    catalog_csv_path: str = "data/interventions_catalog.csv"
+
+    #: AC-23: refuse to start on an uncited or malformed catalog row. Overridable
+    #: only so a developer can boot the UI before sourcing the data — never in
+    #: production, which is asserted at startup.
+    catalog_strict: bool = True
+
     # ── Redis / jobs ─────────────────────────────────────────────────────────
     redis_url: str = "redis://localhost:6379/0"
     rq_queue_name: str = "coolrx"

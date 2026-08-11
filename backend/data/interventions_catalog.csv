@@ -1,0 +1,37 @@
+# CoolRx intervention catalog — DATA REQUIRED BEFORE THE OPTIMIZER CAN RUN
+#
+# This file intentionally ships with no data rows.
+#
+# SRS §11.4 states that this document does not supply unit costs or effect
+# sizes, because inventing plausible-looking constants would violate principle
+# P1 (never present an unsourced number as a finding) at the seeding layer.
+# Every value below must be traceable to a published source, and the citation is
+# reproduced verbatim in the report appendix a city planner reads.
+#
+# Columns (all required, order is not significant):
+#
+#   code                 stable identifier, snake_case, e.g. street_tree_medium
+#   category             one of: water | green | shade | material
+#   name                 human label shown in the UI
+#   unit                 the unit `quantity` is counted in, e.g. tree, m2, unit
+#   unit_cost_usd        installed capital cost per unit, USD
+#   delta_c_low          most conservative published cooling effect, °C, NEGATIVE
+#   delta_c_high         least conservative published cooling effect, °C, NEGATIVE
+#                        must satisfy delta_c_low < delta_c_high
+#                        (e.g. low = -2.50, high = -0.40)
+#   lifespan_years       service life used for annualised cost, integer > 0
+#   maintenance_usd_yr   recurring cost per unit per year, USD
+#   feasibility_rule     JSON object of tile-feature preconditions, {} if none
+#                        e.g. {"max_canopy_pct": 40, "min_impervious_pct": 30}
+#   source_citation      full citation. MUST NOT BE EMPTY — the database, the
+#                        loader and the startup gate each reject an empty value.
+#
+# Sign convention: cooling is negative, matching ΔT = counterfactual − baseline
+# everywhere else in the system. A positive delta would describe warming.
+#
+# Example of the expected shape (commented out — the numbers are placeholders,
+# not sourced values, and must not be used):
+#
+# street_tree_medium,green,Medium street tree,tree,450.00,-2.50,-0.40,30,35.00,"{""max_canopy_pct"": 40}","Author, A. (Year). Title. Journal, vol(issue), pages. DOI"
+#
+code,category,name,unit,unit_cost_usd,delta_c_low,delta_c_high,lifespan_years,maintenance_usd_yr,feasibility_rule,source_citation
