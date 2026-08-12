@@ -18,9 +18,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from core.config import Settings, get_settings
 from middleware.correlation import CorrelationIdMiddleware
+from middleware.demo_key import DemoKeyMiddleware
+from middleware.errors import register_error_handlers
+from middleware.rate_limit import RateLimitMiddleware
 from repositories.base import check_connectivity, postgis_available, session_scope
 from repositories.catalog import CatalogError, assert_catalog_ready
-from routes import health
+from routes import analytics, health, jobs, plans, projects
 
 log = structlog.get_logger(__name__)
 
@@ -177,9 +180,24 @@ def create_app() -> FastAPI:
         allow_methods=["GET", "POST", "OPTIONS"],
         allow_headers=["Content-Type", "X-Demo-Key"],
     )
+    # Order matters. Starlette applies middleware in reverse registration order, so
+    # the last one added runs outermost. Correlation is therefore registered last:
+    # every rejection below it — rate limit or demo key — arrives with a correlation
+    # id, and one without would be untraceable in the logs.
+    #
+    # The demo-key check sits inside the rate limiter so an unauthenticated flood is
+    # throttled before it reaches the comparison, rather than after.
+    app.add_middleware(DemoKeyMiddleware)
+    app.add_middleware(RateLimitMiddleware)
     app.add_middleware(CorrelationIdMiddleware)
 
+    register_error_handlers(app)
+
     app.include_router(health.router, prefix="/api")
+    app.include_router(projects.router, prefix="/api")
+    app.include_router(analytics.router, prefix="/api")
+    app.include_router(plans.router, prefix="/api")
+    app.include_router(jobs.router, prefix="/api")
 
     return app
 

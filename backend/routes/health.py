@@ -93,6 +93,20 @@ def readiness(settings: SettingsDep, response: Response) -> ReadinessResponse:
             )
         )
 
+    # Redis — no jobs can run without it, so an analysis request would be accepted
+    # and then immediately fail. Readiness reports it rather than letting that
+    # happen per-request.
+    from workers.queue import redis_available
+
+    redis_up = redis_available()
+    checks.append(
+        ReadinessCheck(
+            name="redis",
+            state="ok" if redis_up else "down",
+            detail=None if redis_up else "Cannot reach Redis; no jobs can be queued",
+        )
+    )
+
     # Intervention catalog — every entry must carry a source citation. The app
     # deliberately refuses to serve with an uncited unit cost (AC-23).
     #

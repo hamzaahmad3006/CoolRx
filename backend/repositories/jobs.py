@@ -160,6 +160,24 @@ class JobRepository:
         )
         return True
 
+    def find_active(self, *, project_id: uuid.UUID, kind: JobKind) -> Job | None:
+        """An in-flight job of this kind for this project, if one exists.
+
+        Used to refuse a duplicate rather than queue it: two concurrent diagnose
+        runs on one project would both spend credits computing the same thing.
+        """
+        stmt = (
+            select(Job)
+            .where(
+                Job.project_id == project_id,
+                Job.kind == kind,
+                Job.status.in_(["queued", "running"]),
+            )
+            .order_by(Job.created_at.desc())
+            .limit(1)
+        )
+        return self._session.execute(stmt).scalar_one_or_none()
+
     def list_for_project(self, project_id: uuid.UUID, limit: int = 20) -> list[Job]:
         stmt = (
             select(Job)

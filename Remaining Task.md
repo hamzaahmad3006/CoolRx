@@ -4,7 +4,7 @@ Working document. Tasks are ordered by dependency, so doing them top-to-bottom
 avoids writing anything twice. Each is sized to be finishable and verifiable on
 its own.
 
-**Last updated:** 2026-08-12 · **Commits so far:** `b40b240`, `1b0e214` · **Tests:** 207 passing
+**Last updated:** 2026-08-12 · **Commits:** `b40b240`, `1b0e214`, `7d09e25` · **Tests:** 289 passing
 
 ---
 
@@ -14,9 +14,9 @@ its own.
 |---|---|---|
 | Frontend pages | 4 of 10 | 6 screens + 1 overlay |
 | Backend persistence | ✅ complete | — |
-| Backend pipeline | 0 of 5 modules | `geo`, `ml`, `optimizer`, `agent`, `report` |
-| Backend API surface | health only | schemas, controllers, routes, workers |
-| Data | — | ⚠️ intervention catalog (see blocker) |
+| Backend pipeline | priorities only | `geo`, `ml`, `optimizer`, `agent`, `report` |
+| Backend API surface | ✅ 18 routes wired | — |
+| Data | — | ⚠️ catalog (B-1) and fixtures (B-2) |
 
 ---
 
@@ -43,6 +43,24 @@ Minimum viable set is four rows, one per category: `green` (street tree),
 - [ ] Source and populate the catalog CSV
 - [ ] `python -m scripts.load_catalog --dry-run` exits 0
 - [ ] `python -m scripts.load_catalog` loads it and readiness reports `ok`
+
+### B-2 · FortyGuard response fixtures
+`backend/data/fixtures/` is empty. `FIXTURE_MODE=true` is how the demo runs with zero
+credits (SRS P7) and how the tests avoid spending a budget — but a fixture is a
+**recorded** response, not a plausible one. Hand-writing a temperature field would
+launder invented measurements into the map, which is the same P1 violation as
+inventing catalog costs. So the pipeline fails loudly with no fixtures rather than
+degrading to synthetic data, and `fixture_strict` defaults to `true`.
+
+Needs a `FORTYGUARD_API_KEY` and 14 calls per district — once. Every later run is free.
+Full contract in `backend/data/fixtures/README.md`.
+
+**Blocks:** the offline demo, and any integration test of the pipeline.
+**Needs first:** the `geo` module for tiling (Task 3).
+
+- [ ] `scripts/harvest_fixtures.py`
+- [ ] Capture Phoenix
+- [ ] Capture two more preset districts
 
 ---
 
@@ -96,19 +114,53 @@ were rendering values that can legitimately be missing. Added `formatNumberMaybe
 and `formatHourOfDayMaybe`, which render an em dash rather than `0` — a zero in a
 temperature column reads as a measurement.
 
-### Task 2 · Controllers, routes and workers
-- [ ] `controllers/projects.py` — AOI validation → geodesic area → persist
-- [ ] `controllers/diagnose.py` — orchestrate the diagnose pipeline as an RQ job
-- [ ] `controllers/prescribe.py` — orchestrate the plan pipeline as an RQ job
-- [ ] `controllers/jobs.py` — status reads, SSE stream
-- [ ] `controllers/catalog.py` — catalog reads for the UI
-- [ ] `routes/` — one router per controller, `/api` prefix, no business logic
-- [ ] `workers/` — RQ queue setup, job entry points, stale-job reaper
-- [ ] `middleware/` — error envelope, rate limit, demo-key gate
-- [ ] Wire fixture mode end-to-end so the frontend can integrate before the ML lands
+### ✅ Task 2 · Controllers, routes and workers — DONE
+- [x] `controllers/errors.py` — domain exceptions, exhaustive code → HTTP status table
+- [x] `controllers/adapters.py` — every schema ↔ wire ↔ row conversion, in one place
+- [x] `controllers/projects.py` — AOI validation → geodesic area → persist
+- [x] `controllers/analytics.py` — tiles, stats, attribution, exposure, priorities
+- [x] `controllers/diagnose.py` — validate, guard, enqueue
+- [x] `controllers/prescribe.py` — plan requests and plan reads with totals re-check
+- [x] `controllers/jobs.py` — status reads + SSE stream
+- [x] `controllers/catalog.py` — catalog reads (no write path, by design)
+- [x] `optimizer/priorities.py` — ranking, computable today from persisted data
+- [x] `routes/` — 18 paths, `/api` prefix, no business logic in any handler
+- [x] `workers/` — RQ queue, job entry points, enqueue boundary, stale-job reaper
+- [x] `middleware/` — error envelope, rate limit, demo-key gate
+- [x] 40 schemas in the generated OpenAPI
 
-**Acceptance:** frontend can drive a full diagnose→prescribe flow against fixtures
-through real HTTP, with honest job progress.
+**Result:** 289 tests passing, up from 207.
+
+**Three bugs worth recording:**
+
+1. **Exceptions raised inside `BaseHTTPMiddleware` never reach FastAPI's exception
+   handlers.** Starlette runs `BaseHTTPMiddleware` outside the layer that dispatches
+   them, so a raise escapes as an unhandled 500. Rate-limited requests would have
+   returned "something went wrong" instead of "slow down", and the demo-key gate
+   would have 500'd instead of 401'd. Middleware now *returns* the envelope.
+2. **`dependency_overrides` cannot reach middleware.** The demo-key gate called
+   `get_settings()` directly, so the test overriding it silently exercised the real
+   environment and reported the gate working when it had never run. Settings are now
+   injected at construction.
+3. **The credit guard compared two different units** — a per-day submission count
+   against a credit-balance floor (200 vs 50,000), which would have refused *every*
+   live diagnosis. The submission cap is now checked locally; the credit reserve
+   stays inside the client, which is the only layer that can see the balance.
+
+Also: `field: str | None` on the error dataclass shadowed `dataclasses.field` inside
+the class body, which crashed at import; and the AOI test fixture was 11.94 mi²
+against a 10 mi² cap — the validator was right, my arithmetic wasn't.
+
+**What does not work yet, and why.** `POST /diagnose` and `POST /plans` accept,
+validate, guard, enqueue and report progress — then fail with a message naming the
+missing module. The pipeline stages need `geo`, `ml` and `optimizer` (Tasks 3–5).
+The alternative was synthesising temperature data to make the flow appear to work,
+which would put invented numbers in front of the person evaluating the tool.
+
+**Second data dependency discovered:** `data/fixtures/` is empty, and fixtures must be
+**captured** from the live API, not written. See `backend/data/fixtures/README.md` —
+hand-writing a temperature field is the same P1 violation as inventing catalog costs.
+14 calls per district, 3 districts, one time. Tracked as blocker B-2 below.
 
 ---
 
