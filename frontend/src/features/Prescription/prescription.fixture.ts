@@ -128,6 +128,7 @@ export const PRESCRIPTION_FIXTURE: Plan = {
   modelVersion: MODEL_VERSION,
   totals: {
     totalCostUsd: 353_100,
+    budgetUsd: 400_000,
     meanDelta: {
       value: -2.3,
       ciLow: -3.0,

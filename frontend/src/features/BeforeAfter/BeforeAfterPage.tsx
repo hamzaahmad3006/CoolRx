@@ -131,7 +131,11 @@ export function BeforeAfterPage({
             <StatTile
               label="People reached"
               icon="vulnerability"
-              detail={`${formatPercentScaled(pctTopSviQuartile)} in the most vulnerable quartile`}
+              detail={
+                pctTopSviQuartile === null
+                  ? 'Vulnerability breakdown unavailable for this area'
+                  : `${formatPercentScaled(pctTopSviQuartile)} in the most vulnerable quartile`
+              }
               onShowProvenance={() => undefined}
             >
               {formatNumber(peopleReached, 'people')}

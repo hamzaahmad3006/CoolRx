@@ -218,7 +218,11 @@ export function PrescriptionPage({
               <StatTile
                 label="People reached"
                 icon="vulnerability"
-                detail={`${formatPercentScaled(plan.totals.pctReachedTopSviQuartile)} in the most vulnerable quartile`}
+                detail={
+                  plan.totals.pctReachedTopSviQuartile === null
+                    ? 'Vulnerability breakdown unavailable for this area'
+                    : `${formatPercentScaled(plan.totals.pctReachedTopSviQuartile)} in the most vulnerable quartile`
+                }
                 onShowProvenance={() => undefined}
               >
                 {formatNumber(plan.totals.peopleReached, 'people')}

@@ -15,6 +15,7 @@ import pytest
 from repositories.catalog import (
     REQUIRED_COLUMNS,
     VALID_CATEGORIES,
+    VALID_UNITS,
     CatalogError,
     read_catalog_csv,
     validate_row,
@@ -127,6 +128,22 @@ def test_invalid_lifespan_is_rejected(bad: str) -> None:
 @pytest.mark.parametrize("field", ["code", "name", "unit"])
 def test_required_text_fields_must_be_present(field: str) -> None:
     assert any(r.startswith(f"{field}:") for r in _reasons(_row(**{field: "  "})))
+
+
+@pytest.mark.parametrize("bad", ["", "trees", "sqm", "m²", "each", "TREE"])
+def test_invalid_unit_is_rejected(bad: str) -> None:
+    """The UI formats quantities per unit, so an unknown unit has no formatter.
+
+    `m²` is rejected on purpose: the canonical code is `m2`, and accepting both
+    would let two spellings of one unit coexist in the catalog.
+    """
+    assert any(r.startswith("unit:") for r in _reasons(_row(unit=bad)))
+
+
+def test_every_valid_unit_is_accepted() -> None:
+    for unit in VALID_UNITS:
+        _, violations = validate_row(_row(unit=unit), 2)
+        assert violations == [], f"{unit} should be valid"
 
 
 def test_all_violations_are_reported_at_once() -> None:

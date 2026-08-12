@@ -1,7 +1,11 @@
 'use client';
 
 import { ERROR_COPY, GLOSSARY } from '@/constants';
-import { formatHourOfDay, formatNumber } from '@/lib/format';
+import {
+  formatHourOfDayMaybe,
+  formatNumber,
+  formatNumberMaybe,
+} from '@/lib/format';
 import type { TilePriority } from '@/types';
 import { AppShell } from '@/components/layout/AppShell';
 import { DistributionChart } from '@/components/charts/DistributionChart';
@@ -76,26 +80,26 @@ export function DiagnosisPage({
       key: 'exceedance',
       header: 'Hours',
       numeric: true,
-      render: (row) => formatNumber(row.exceedanceHours, 'hour'),
+      render: (row) => formatNumberMaybe(row.exceedanceHours, 'hour'),
     },
     {
       key: 'persistence',
       header: 'Unbroken',
       numeric: true,
-      render: (row) => formatNumber(row.persistenceHours, 'hour'),
+      render: (row) => formatNumberMaybe(row.persistenceHours, 'hour'),
     },
     {
       key: 'peak',
       header: 'Peaks',
       numeric: true,
       hideOnNarrow: true,
-      render: (row) => formatHourOfDay(row.peakHourLocal),
+      render: (row) => formatHourOfDayMaybe(row.peakHourLocal),
     },
     {
       key: 'population',
       header: 'People',
       numeric: true,
-      render: (row) => formatNumber(row.population, 'people'),
+      render: (row) => formatNumberMaybe(row.population, 'people'),
     },
     {
       key: 'phh',
@@ -103,7 +107,7 @@ export function DiagnosisPage({
       numeric: true,
       render: (row) => (
         <span className="font-medium">
-          {formatNumber(row.personHeatHours, 'person_hour')}
+          {formatNumberMaybe(row.personHeatHours, 'person_hour')}
         </span>
       ),
     },

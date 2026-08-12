@@ -125,19 +125,26 @@ export interface TilesQuery {
 export interface TilesResponse {
   readonly analytic: FgAnalyticType;
   /** Echoed from the API's own stats_data.units — never assumed client-side. */
-  readonly units: string;
+  readonly units: string | null;
   readonly thresholdC: number | null;
   readonly granularity: FgGranularity;
   readonly tileCount: number;
-  readonly generatedFrom: { readonly activityId: string };
+  /**
+   * Tiles that returned no value. Surfaced so the UI can state coverage rather
+   * than let a sparse layer look like a complete one.
+   */
+  readonly nullCount: number;
+  /** FortyGuard provenance anchor. Null for a fixture-backed run. */
+  readonly activityId: string | null;
   readonly features: TileCollection['features'];
 }
 
 export interface StatsResponse {
   readonly analyticRuns: readonly AnalyticRun[];
   readonly stats: FgStatsData;
-  readonly hotspotCutoff: number;
-  readonly districtMeanC: number;
+  /** Null until at least one analytic run has values to derive it from. */
+  readonly hotspotCutoff: number | null;
+  readonly districtMeanC: number | null;
 }
 
 export interface AttributionResponse {
@@ -150,7 +157,9 @@ export interface ExposureResponse {
 
 export interface PriorityResponse {
   readonly items: readonly TilePriority[];
+  /** Echoed so a ranking is never shown without the λ that produced it. */
   readonly equityLambda: number;
+  readonly thresholdC: number;
 }
 
 export interface CandidatesResponse {
@@ -165,6 +174,8 @@ export interface CreatePlanRequest {
   readonly budgetUsd: number;
   readonly objective: PlanObjective;
   readonly equityLambda: number;
+  /** Defaults to the project's diagnosis threshold when omitted. */
+  readonly thresholdC?: number;
 }
 
 export type CreatePlanResponse = Plan;
@@ -175,7 +186,14 @@ export interface CounterfactualResponse {
   readonly features: TileCollection['features'];
   /** Shared colour-scale domain — both sides of the swipe MUST use it. */
   readonly scaleDomain: readonly [number, number];
-  readonly units: string;
+  readonly units: string | null;
+  /**
+   * Tiles the model refused to predict because the modified feature vector fell
+   * outside its training support. Returned explicitly rather than silently
+   * omitted — a gap in the after-map needs a reason.
+   */
+  readonly outOfSupportTileKeys: readonly string[];
+  readonly estimateDisclaimer: string;
 }
 
 export interface ProvenanceResponse {

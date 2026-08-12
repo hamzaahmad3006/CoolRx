@@ -32,7 +32,8 @@ interface UseBeforeAfterResult {
   readonly heatHoursAvoided: number;
   readonly personHeatHoursAvoided: number;
   readonly peopleReached: number;
-  readonly pctTopSviQuartile: number;
+  /** Null when exposure data is too sparse to compute the quartile honestly. */
+  readonly pctTopSviQuartile: number | null;
   readonly treatedTileCount: number;
   readonly deltaBins: readonly { deltaC: number; count: number }[];
   readonly maxAbsDelta: number;

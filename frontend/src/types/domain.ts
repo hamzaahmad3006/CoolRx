@@ -117,11 +117,11 @@ export interface AnalyticRun {
   readonly startDate: string;
   readonly startTime: string | null;
   readonly filterType: FgFilterType;
-  /** Read from the API response, never assumed. */
-  readonly units: FgUnits;
+  /** Read from the API response, never assumed. Null if the response omitted it. */
+  readonly units: FgUnits | null;
   readonly stats: FgStatsData;
-  /** FortyGuard handle — the provenance anchor. */
-  readonly activityId: string;
+  /** FortyGuard handle — the provenance anchor. Null for a fixture-backed run. */
+  readonly activityId: string | null;
   readonly createdAt: string;
 }
 
@@ -137,19 +137,28 @@ export type TileCollection = FgFeatureCollection<FgTileProperties & { readonly t
 /* ═════════════════════════════════════════════════════════════════════════════
  * ENRICHMENT — land cover, exposure, attribution
  * ════════════════════════════════════════════════════════════════════════════*/
+/**
+ * Every field is nullable, matching the backend schema.
+ *
+ * The upstream datasets have real gaps — NLCD does not cover every cell and
+ * elevation tiles have voids — so a non-nullable type here would force the
+ * enrichment step to invent a value to satisfy it. `null` means missing; it is
+ * never 0.
+ */
 export interface TileFeatures {
   readonly tileKey: string;
-  readonly canopyPct: number;
-  readonly imperviousPct: number;
-  readonly buildingPct: number;
-  readonly waterPct: number;
-  readonly grassShrubPct: number;
-  readonly albedoProxy: number;
+  readonly canopyPct: number | null;
+  readonly imperviousPct: number | null;
+  readonly buildingPct: number | null;
+  readonly waterPct: number | null;
+  readonly grassShrubPct: number | null;
+  readonly albedoProxy: number | null;
   /** From OSM building-footprint density — NOT a true sky-view factor. */
-  readonly opennessProxy: number;
+  readonly opennessProxy: number | null;
   readonly elevationM: number | null;
+  readonly localReliefM: number | null;
   readonly distToWaterM: number | null;
-  readonly districtMeanC: number;
+  readonly districtMeanC: number | null;
 }
 
 export interface AssetCounts {
@@ -160,15 +169,16 @@ export interface AssetCounts {
   readonly hospital: number;
 }
 
+/** Nullable throughout: a tile outside a census block group has no exposure. */
 export interface Exposure {
   readonly tileKey: string;
   /** Dasymetric estimate — non-integer by construction, not a count. */
-  readonly population: number;
-  readonly pctOver65: number;
-  readonly pctPoverty: number;
+  readonly population: number | null;
+  readonly pctOver65: number | null;
+  readonly pctPoverty: number | null;
   /** Census-TRACT resolution — coarser than the tile. Label it as such. */
-  readonly sviScore: number;
-  readonly sviSourceGeoid: string;
+  readonly sviScore: number | null;
+  readonly sviSourceGeoid: string | null;
   readonly assets: AssetCounts;
 }
 
@@ -199,17 +209,17 @@ export interface TilePriority {
   readonly tileKey: string;
   readonly rank: number;
   readonly riskLevel: RiskLevel;
-  /** Hours above the threshold. */
-  readonly exceedanceHours: number;
+  /** Hours above the threshold. Null where the analytic returned no value. */
+  readonly exceedanceHours: number | null;
   /** Longest continuous run of hours past the threshold. */
-  readonly persistenceHours: number;
-  /** Hour of day (0–23) of peak temperature, converted to local time. */
-  readonly peakHourLocal: number;
-  readonly population: number;
+  readonly persistenceHours: number | null;
+  /** Hour of day (0–23) of peak temperature, converted to LOCAL time. */
+  readonly peakHourLocal: number | null;
+  readonly population: number | null;
   /** population × exceedanceHours. A derived quantity with units, not an index. */
-  readonly personHeatHours: number;
+  readonly personHeatHours: number | null;
   /** personHeatHours × (1 + λ · SVI). λ is a policy choice. */
-  readonly equityWeightedPhh: number;
+  readonly equityWeightedPhh: number | null;
 }
 
 /* ═════════════════════════════════════════════════════════════════════════════
@@ -266,11 +276,18 @@ export interface PlanItem {
 
 export interface PlanTotals {
   readonly totalCostUsd: number;
+  /** Echoed so a plan is never rendered without the ceiling it respected. */
+  readonly budgetUsd: number;
+  /**
+   * Area-weighted across the whole AOI including untreated tiles, so this is
+   * NOT the mean of the item deltas and will normally be smaller.
+   */
   readonly meanDelta: Estimate;
   readonly heatHoursAvoided: number;
   readonly personHeatHoursAvoided: number;
   readonly peopleReached: number;
-  readonly pctReachedTopSviQuartile: number;
+  /** Null when exposure data is too sparse to compute it honestly. */
+  readonly pctReachedTopSviQuartile: number | null;
 }
 
 export interface Plan {
@@ -318,10 +335,17 @@ export interface VerificationResult {
   /** Difference of differences. */
   readonly observedDeltaC: number;
   readonly predictedDelta: Estimate;
+  /**
+   * Whether the observation fell inside the predicted interval. Deliberately
+   * NOT named `success`: a prediction can be correct about a disappointing
+   * outcome, and an observation outside the interval is information about the
+   * model, not a verdict on the intervention.
+   */
   readonly withinCi: boolean;
   readonly method: 'difference_in_differences';
   /** Confounder warning — displayed adjacent to the number, not in a footnote. */
   readonly caveat: string;
+  readonly measuredAt: string;
 }
 
 /* ═════════════════════════════════════════════════════════════════════════════
@@ -329,17 +353,25 @@ export interface VerificationResult {
  * ════════════════════════════════════════════════════════════════════════════*/
 export type JobStatus = 'queued' | 'running' | 'completed' | 'failed' | 'degraded';
 
-export type JobKind = 'diagnose' | 'plan' | 'verify';
+export type JobKind = 'diagnose' | 'plan' | 'verify' | 'harvest';
 
 export interface Job {
   readonly id: string;
-  readonly projectId: string;
+  /** Null for a harvest job, which is not scoped to a project. */
+  readonly projectId: string | null;
   readonly kind: JobKind;
   readonly status: JobStatus;
   readonly stage: string | null;
   readonly progressPct: number;
+  /** Derived from createdAt server-side, not stored. */
   readonly elapsedS: number;
+  /**
+   * The failure message when `failed`, and the degradation reason when
+   * `degraded` — a successful-but-partial run explains itself here.
+   */
   readonly error: string | null;
+  readonly createdAt: string;
+  readonly updatedAt: string;
 }
 
 export interface JobProgressEvent {
@@ -362,6 +394,20 @@ export interface AgentNodeRecord {
   readonly tokensOut: number | null;
 }
 
+/**
+ * One numeral the guard rejected.
+ *
+ * The token alone does not show whether the model invented a figure or merely
+ * reformatted an allowed one, so the surrounding context is kept too — that
+ * distinction is the whole diagnostic value of the trace.
+ */
+export interface GuardViolation {
+  readonly node: string;
+  readonly token: string;
+  readonly context: string;
+  readonly reason: string;
+}
+
 export interface AgentRun {
   readonly id: string;
   readonly planId: string;
@@ -369,10 +415,11 @@ export interface AgentRun {
   readonly model: string;
   readonly nodes: readonly AgentNodeRecord[];
   readonly guardVerdict: GuardVerdict;
-  readonly guardViolations: readonly string[];
-  readonly tokensIn: number;
-  readonly tokensOut: number;
-  readonly durationMs: number;
+  /** Empty on a clean run. Populated violations are displayed, not suppressed. */
+  readonly guardViolations: readonly GuardViolation[];
+  readonly tokensIn: number | null;
+  readonly tokensOut: number | null;
+  readonly durationMs: number | null;
   readonly createdAt: string;
 }
 
@@ -422,10 +469,16 @@ export interface CreditStatus {
   readonly liveAnalysisEnabled: boolean;
 }
 
+/**
+ * `skipped` is distinct from `ok`: liveness must stay cheap, so a dependency it
+ * does not probe is reported as unchecked rather than as healthy.
+ */
+export type DependencyState = 'ok' | 'down' | 'skipped';
+
 export interface HealthStatus {
   readonly status: 'ok' | 'degraded' | 'down';
   readonly version: string;
   readonly mode: DataMode;
   readonly modelVersion: string;
-  readonly dependencies: Readonly<Record<string, 'ok' | 'down'>>;
+  readonly dependencies: Readonly<Record<string, DependencyState>>;
 }

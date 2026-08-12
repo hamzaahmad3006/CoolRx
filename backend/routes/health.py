@@ -9,39 +9,23 @@ violate the numeric-grounding rule at the data layer (SRS §23.8, FR-013).
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Response, status
-from pydantic import BaseModel
 
 from core.config import Settings, get_settings
 from repositories.base import check_connectivity, postgis_available, session_scope
 from repositories.catalog import CatalogError, assert_catalog_ready
+from schemas.system import (
+    DependencyState,
+    HealthResponse,
+    ReadinessCheck,
+    ReadinessResponse,
+)
 
 router = APIRouter(tags=["system"])
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]
-
-DependencyState = Literal["ok", "down", "skipped"]
-
-
-class HealthResponse(BaseModel):
-    status: Literal["ok", "degraded", "down"]
-    version: str
-    mode: Literal["live", "fixture"]
-    model_version: str
-    dependencies: dict[str, DependencyState]
-
-
-class ReadinessCheck(BaseModel):
-    name: str
-    state: DependencyState
-    detail: str | None = None
-
-
-class ReadinessResponse(BaseModel):
-    ready: bool
-    checks: list[ReadinessCheck]
 
 
 @router.get("/health", response_model=HealthResponse, summary="Liveness")

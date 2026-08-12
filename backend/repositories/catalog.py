@@ -39,6 +39,13 @@ VALID_CATEGORIES: Final[frozenset[str]] = frozenset(
     {"water", "green", "shade", "material"}
 )
 
+#: Constrained rather than free-text: the UI formats a quantity per unit
+#: ("12 trees", "400 m²"), so an unrecognised unit reaches the client with no
+#: formatter and renders as a bare number with no dimension.
+VALID_UNITS: Final[frozenset[str]] = frozenset(
+    {"tree", "m2", "structure", "linear_m", "station"}
+)
+
 REQUIRED_COLUMNS: Final[tuple[str, ...]] = (
     "code",
     "category",
@@ -108,9 +115,12 @@ def validate_row(
     if category not in VALID_CATEGORIES:
         fail("category", f"must be one of {sorted(VALID_CATEGORIES)}, got {category!r}")
 
-    for field in ("name", "unit"):
-        if not (raw.get(field) or "").strip():
-            fail(field, "must not be empty")
+    if not (raw.get("name") or "").strip():
+        fail("name", "must not be empty")
+
+    unit = (raw.get("unit") or "").strip()
+    if unit not in VALID_UNITS:
+        fail("unit", f"must be one of {sorted(VALID_UNITS)}, got {unit!r}")
 
     # The citation check that AC-23 turns into a boot failure.
     citation = (raw.get("source_citation") or "").strip()
@@ -159,7 +169,7 @@ def validate_row(
             code=code,
             category=category,
             name=raw["name"].strip(),
-            unit=raw["unit"].strip(),
+            unit=unit,
             unit_cost_usd=cost,
             delta_c_low=low,
             delta_c_high=high,

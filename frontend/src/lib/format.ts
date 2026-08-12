@@ -131,6 +131,37 @@ export function formatMaybe(
   return formatValue(value, unit);
 }
 
+/**
+ * An em dash, used for a missing value in a numeric table cell.
+ *
+ * Deliberately not `0`, not `-` and not an empty cell: a zero would read as a
+ * measurement, a hyphen is ambiguous with a minus sign in a column of negative
+ * temperatures, and an empty cell looks like a rendering fault.
+ */
+export const MISSING_MARK = '—';
+
+/**
+ * Bare number that may be missing — for table cells whose column header already
+ * carries the unit, so appending it again would repeat it in every row.
+ */
+export function formatNumberMaybe(
+  value: number | null,
+  unit: EstimateUnit,
+  fallback: string = MISSING_MARK,
+): string {
+  if (value === null) return fallback;
+  return formatNumber(value, unit);
+}
+
+/** Hour of day that may be missing. */
+export function formatHourOfDayMaybe(
+  hour: number | null,
+  fallback: string = MISSING_MARK,
+): string {
+  if (hour === null) return fallback;
+  return formatHourOfDay(hour);
+}
+
 /** Truncate a long identifier for display, keeping it recognisable. */
 export function truncateId(id: string, visible = 8): string {
   return id.length <= visible ? id : `${id.slice(0, visible)}…`;
