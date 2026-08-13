@@ -7,6 +7,7 @@ import {
   formatNumberMaybe,
 } from '@/lib/format';
 import type { TilePriority } from '@/types';
+import { AttributionDrawer } from '@/features/AttributionDrawer/AttributionDrawer';
 import { AppShell } from '@/components/layout/AppShell';
 import { DistributionChart } from '@/components/charts/DistributionChart';
 import { PeakHourClock } from '@/components/charts/PeakHourClock';
@@ -261,6 +262,11 @@ export function DiagnosisPage({
           </div>
         </div>
       </div>
+
+      {/* SRS screen #4 — overlays this page rather than being its own route, so
+          the map stays visible behind it and the selected block keeps its
+          context. Renders nothing until a block is selected. */}
+      <AttributionDrawer projectId={projectId} />
     </AppShell>
   );
 }

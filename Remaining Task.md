@@ -4,7 +4,10 @@ Working document. Tasks are ordered by dependency, so doing them top-to-bottom
 avoids writing anything twice. Each is sized to be finishable and verifiable on
 its own.
 
-**Last updated:** 2026-08-12 · **Commits:** `b40b240`, `1b0e214`, `7d09e25` · **Tests:** 289 passing
+**Last updated:** 2026-08-13 · **Branch:** `feature/geo-guard-attribution` · **Tests:** 382 passing
+
+> Commit SHAs changed when history was rewritten for the initial push; see
+> `git log` rather than quoting them here.
 
 ---
 
@@ -12,9 +15,9 @@ its own.
 
 | Layer | Done | Remaining |
 |---|---|---|
-| Frontend pages | 4 of 10 | 6 screens + 1 overlay |
+| Frontend pages | 4 of 10 + drawer | 6 screens |
 | Backend persistence | ✅ complete | — |
-| Backend pipeline | priorities only | `geo`, `ml`, `optimizer`, `agent`, `report` |
+| Backend pipeline | geo grid, priorities, numeric guard | raster/census providers, `ml`, `optimizer`, agent graph, `report` |
 | Backend API surface | ✅ 18 routes wired | — |
 | Data | — | ⚠️ catalog (B-1) and fixtures (B-2) |
 
@@ -166,17 +169,36 @@ hand-writing a temperature field is the same P1 violation as inventing catalog c
 
 ## Phase B — The pipeline (bottom-up, each usable alone)
 
-### Task 3 · `backend/geo/` — tiling and feature enrichment
-- [ ] Tile grid generation from an AOI at 60/80/100 m
-- [ ] Stable `tile_key` (geohash of centroid) so one ground location keeps one key
-- [ ] NLCD land cover → canopy / impervious / building / water / grass-shrub %
-- [ ] Albedo proxy, openness proxy (OSM footprint density — **not** a true sky-view factor, SRS NG-12)
-- [ ] Elevation, local relief, distance to water
-- [ ] Census dasymetric population + SVI join at tract resolution
-- [ ] Mark every derived field's resolution so the UI can caveat it
+### ✅ Task 3 · `backend/geo/` — tiling and feature enrichment — DONE
+- [x] Tile grid generation from an AOI at 60/80/100 m
+- [x] Stable `tile_key` (geohash of centroid) so one ground location keeps one key
+- [x] Provider contract with per-provider native resolution and vintage
+- [x] Enrichment merge that guarantees null-never-becomes-zero
+- [x] Coverage reporting per field
+- [ ] NLCD raster provider — needs rasterio + the NLCD tiles (see below)
+- [ ] Terrain provider — needs elevation rasters
+- [ ] Census dasymetric population + SVI join — needs the Census API
 
-**Acceptance:** an AOI produces a complete `tile_features` + `exposure` table with
-nulls where data is genuinely missing — never zeros standing in for missing.
+**The grid is built in UTM, not in degrees.** A degree grid has cells whose width
+changes with latitude, so a "60 m" tile would be 60 m tall and something else wide,
+and person-heat-hours — population × hours summed over tiles — would be computed
+over cells of unequal area. Snapping to a multiple of the granularity in UTM also
+makes the grid globally deterministic, so **two overlapping projects share tile keys
+for shared ground** and enrichment can be reused rather than recomputed per AOI.
+There's a test asserting exactly that.
+
+Precision-9 geohash, deliberately: precision 8 is 38 m × 19 m, and two neighbouring
+60 m centroids could share one cell along the narrow axis — silently merging two
+places into one row.
+
+**Raster/network providers are stubs by design, not by omission.** Each is imported
+inside a try/except and replaced with an `UnavailableProvider` that returns explicit
+nulls and a named reason. The run completes with an honest empty column rather than
+crashing or — worse — quietly dropping the field so downstream code defaults it.
+Wiring the real NLCD/terrain/census sources needs rasterio + GDAL, which is the
+Python 3.14 dependency risk already flagged.
+
+50 tests, including a geodesic check that cells really are the requested size.
 
 ### Task 4 · `backend/ml/` — model and attribution
 - [ ] Feature assembly from `tile_features` + FortyGuard `tcm`
@@ -205,17 +227,36 @@ inputs are rejected with a reason rather than silently extrapolated.
 **Acceptance:** a plan never exceeds budget, every ΔT is clamped to a cited range,
 and no output claims an intervention *caused* a measured reduction.
 
-### Task 6 · `backend/agent/` — LangGraph and the numeric guard
-- [ ] 5 nodes only, as specified — no more
-- [ ] `numeric_guard`: deterministic regex + set-membership check that no
-      LLM-generated numeral reaches output
-- [ ] Retry-on-violation, then fail closed to the number-free template
+### 🟡 Task 6 · `backend/agent/` — numeric guard DONE, graph remaining
+- [x] `numeric_guard`: deterministic extraction + set-membership check
+- [x] Retry-on-violation, then fail closed to the number-free template
+- [x] Adversarial test battery (43 tests)
+- [ ] LangGraph, 5 nodes only
 - [ ] Persist node trace, guard verdict and violations to `agent_runs`
 - [ ] Model: `claude-opus-5`
 
-**Acceptance:** the guard is tested against adversarial cases — an LLM that
-invents a figure must be caught, and the plan must remain valid with the prose
-dropped entirely.
+The guard is the load-bearing half and is complete and independently testable, so
+it landed first. It contains no LLM calls on purpose — it can therefore be tested
+exhaustively and cheaply, and cannot fail because a network call did.
+
+**Bypasses it catches**, each with a test:
+
+| Bypass | Example |
+|---|---|
+| Spelled-out numbers | "twenty trees" when 12 was supplied |
+| Rounding | "about 2 degrees" when -1.9 was supplied |
+| Unit conversion | "3.42 °F" from -1.9 °C |
+| Percentage rescaling | "40%" from 0.4 |
+| Derived arithmetic | "12 × 450 totals 5400" when only 12 and 450 were given |
+| Ordinals | "the 3rd hottest block" |
+
+Spelled-out numbers matter most: a digit-only regex is trivially bypassed by writing
+"twelve" instead of "12", and a model told to vary its phrasing does this unprompted.
+
+Comparison is **strict equality after parsing** — formatting is not transformation
+("1,234.5" == "1234.5"), but 1.9 does not admit 2. Model versions like
+`lgbm-2026.08.1` are masked with a length-preserving replacement so their digits
+aren't read as claims while nearby real violations are still caught.
 
 ### Task 7 · `backend/report/` — the Cooling Action Plan PDF
 - [ ] Report renderer with the provenance table
@@ -237,11 +278,24 @@ Pattern for each, already proven on the 4 built pages:
 + optional fixture. All tokens from `constants/`, all types from `types/`, no
 `any` or `unknown`.
 
-### Task 8 · Attribution drawer (SRS screen #4) · overlay on Diagnosis
-- [ ] SHAP waterfall chart
-- [ ] Land-cover donut
-- [ ] Exposure summary for the selected tile
-- [ ] Provenance link for the tile's source analytic run
+### ✅ Task 8 · Attribution drawer (SRS screen #4) — DONE
+- [x] SHAP waterfall chart
+- [x] Land-cover donut
+- [x] Exposure summary for the selected tile
+- [x] Wired into Diagnosis; Escape and scrim both close it
+- [ ] Provenance link for the tile's source analytic run (needs the provenance endpoint)
+
+Verified in the browser, not just typechecked — clicking a priority row opens it,
+all four sections render, Escape closes it, and the console is clean.
+
+Two bugs the browser caught that `tsc` could not:
+- **SVI 0.81 rendered as "1".** The shared `count` precision is 0 decimals, and SVI
+  is a 0–1 index, so high vulnerability displayed as maximum vulnerability.
+- **Distance to water rendered as `1,840` with no unit.**
+
+The donut draws its unmeasured remainder as a hatched arc rather than normalising
+the slices to 100%. Normalising would invent composition data — the fixture keeps
+`buildingPct` null precisely so that path is exercised on every open.
 
 ### Task 9 · AOI Studio (SRS screen #2) · `/studio`
 - [ ] Draggable/resizable AOI box on the map
