@@ -127,6 +127,40 @@ export const INTERVENTION_COLORS = {
 } as const;
 
 /* ─────────────────────────────────────────────────────────────────────────────
+ * LAND COVER
+ *
+ * Categorical, for the attribution drawer's composition donut. Deliberately
+ * muted and distinct from HEAT_SCALE: the donut sits beside the heat map, and a
+ * warm-ramp colour here would read as a temperature.
+ *
+ * `unknown` is a hatched grey, not a slice colour. A tile whose land cover is
+ * unmeasured must look unmeasured — filling the remainder with a real category
+ * would fabricate composition data (SRS FR-008).
+ * ────────────────────────────────────────────────────────────────────────────*/
+export const LAND_COVER_COLORS = {
+  canopy: '#4F7A4A',
+  grassShrub: '#8FA96B',
+  water: '#3E7CA6',
+  building: '#8C8377',
+  impervious: '#B0AAA1',
+  unknown: '#D8D5CF',
+} as const;
+
+export type LandCoverKey = keyof typeof LAND_COVER_COLORS;
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * SHAP ATTRIBUTION
+ *
+ * A driver either pushes a tile hotter or cooler. Two colours only — using the
+ * heat ramp here would imply a temperature value rather than a contribution.
+ * ────────────────────────────────────────────────────────────────────────────*/
+export const ATTRIBUTION_COLORS = {
+  warming: '#C1611F',
+  cooling: '#2F7A72',
+  neutral: '#B8B4AC',
+} as const;
+
+/* ─────────────────────────────────────────────────────────────────────────────
  * RISK LEVELS
  *
  * Per SRS §28.7 a risk level is ALWAYS rendered as colour + icon + word.
