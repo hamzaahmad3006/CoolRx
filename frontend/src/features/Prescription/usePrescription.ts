@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 
 import { INTERVENTION_COLORS, type InterventionCategory } from '@/constants';
 import { useAppDispatch, useAppSelector } from '@/redux/hooks';
@@ -9,6 +9,7 @@ import {
   setEquityLambda,
   setObjective,
 } from '@/redux/slices/planControlsSlice';
+import { setCurrentPlan } from '@/redux/slices/sessionSlice';
 import { useCreatePlanMutation, useGetPlanQuery } from '@/redux/api/coolRxApi';
 import type { Plan, PlanObjective } from '@/types';
 import type { SegmentOption } from '@/components/ui/SegmentedControl';
@@ -83,6 +84,7 @@ export function usePrescription({
   const { budgetUsd, objective, equityLambda } = useAppSelector(
     (state) => state.planControls,
   );
+  const currentPlanId = useAppSelector((state) => state.session.currentPlanId);
 
   const [createPlan, createState] = useCreatePlanMutation();
 
@@ -97,6 +99,19 @@ export function usePrescription({
     if (planQuery.data !== undefined) return planQuery.data;
     return null;
   }, [createState.data, planQuery.data]);
+
+  /**
+   * Publish the plan id to session state.
+   *
+   * The rail's Action Plan, Verify and Agent Trace entries are plan-scoped and
+   * stay disabled until this is set — without it they would never unlock, and the
+   * report would be reachable only by typing its URL.
+   */
+  useEffect(() => {
+    if (plan !== null && plan.id !== currentPlanId) {
+      dispatch(setCurrentPlan(plan.id));
+    }
+  }, [plan, currentPlanId, dispatch]);
 
   const budgetUsedFraction = useMemo(() => {
     if (plan === null || plan.budgetUsd === 0) return 0;

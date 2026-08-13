@@ -305,6 +305,33 @@ export interface Plan {
   readonly createdAt: string;
 }
 
+/* ═════════════════════════════════════════════════════════════════════════════
+ * EQUITY
+ * ════════════════════════════════════════════════════════════════════════════*/
+
+/**
+ * One decile of the Social Vulnerability Index.
+ *
+ * 1-based, with 10 the MOST vulnerable. Stated at the type because an off-by-one
+ * in either direction silently inverts the entire equity narrative — a plan that
+ * looks progressive would read as regressive and vice versa.
+ */
+export interface EquityDecile {
+  readonly decile: number;
+  readonly population: number;
+  readonly personHeatHours: number;
+  readonly personHeatHoursAvoided: number;
+  /** Share of the plan's total avoided person-heat-hours, 0–1. */
+  readonly shareOfBenefit: number;
+}
+
+export interface VulnerableGroupBreakdown {
+  readonly group: string;
+  readonly populationReached: number;
+  readonly shareOfGroupReached: number;
+  readonly personHeatHoursAvoided: number;
+}
+
 /** A candidate the optimizer considered but excluded. */
 export interface InfeasibleCandidate {
   readonly tileKey: string;

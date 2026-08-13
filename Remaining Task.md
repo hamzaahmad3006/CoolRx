@@ -15,7 +15,7 @@ its own.
 
 | Layer | Done | Remaining |
 |---|---|---|
-| Frontend pages | 7 of 10 + drawer | Impact & Equity, Action Plan, Verify |
+| Frontend pages | ✅ 10 of 10 + drawer | — |
 | Backend persistence | ✅ complete | — |
 | Backend pipeline | geo grid, priorities, ladder, optimizer, numeric guard | raster/census providers, `ml`, agent graph, `report` |
 | Backend API surface | ✅ 18 routes wired | plan-generation worker stages |
@@ -337,12 +337,22 @@ while being useless as a district.
 Does **not** use `AppShell`: the Studio runs before a project exists, and the rail
 builds per-project links, so it would emit `/p//diagnose`.
 
-### Task 10 · Cooling Action Plan (SRS screen #8) · `/plans/[id]`
-- [ ] Report preview
-- [ ] Plan table with per-item intervals
-- [ ] Download action
-- [ ] Measurement plan section
-- [ ] Provenance table
+### ✅ Task 10 · Cooling Action Plan (SRS screen #8) · `/plans/[id]` — DONE
+- [x] Report preview, print-ready
+- [x] Plan table with per-item intervals
+- [x] Download action (browser print to PDF)
+- [x] Spend rollup by intervention category
+- [x] Measurement plan section linking to Verify
+- [x] Provenance table with FortyGuard activity ids
+
+Prints the same DOM the reader just reviewed rather than rendering a separate
+server-side template. A second rendering path is a second thing that can disagree
+with the first, and the report's entire claim is that every figure traces to one
+source.
+
+Items whose rationale the guard rejected are **counted and explained** rather than
+silently appearing without prose — a dropped rationale means the mechanism caught
+the model inventing a figure, which is worth saying.
 
 ### ✅ Task 11 · Agent Trace + Methods (SRS screen #10) — DONE
 - [x] Node-by-node execution log, each labelled deterministic or language-model
@@ -363,17 +373,36 @@ narrower than the real uncertainty rather than presenting them as calibrated.
 Limitations are split into methodology caveats (permanent) and model-card caveats
 (version-specific). Merging them would let a version bump quietly drop a permanent one.
 
-### Task 12 · Impact & Equity (SRS screen #7, P1) · `/p/[id]/equity`
-- [ ] Vulnerable-group breakdown
-- [ ] Person-heat-hours by decile
-- [ ] λ sensitivity view
-- [ ] SVI tract-resolution caveat displayed, not buried
+### ✅ Task 12 · Impact & Equity (SRS screen #7) · `/p/[id]/equity` — DONE
+- [x] Vulnerable-group breakdown
+- [x] Person-heat-hours avoided by SVI decile
+- [x] λ slider with the policy-choice caveat beside it
+- [x] SVI tract-resolution caveat displayed, not buried
 
-### Task 13 · Verify (SRS screen #9, P1) · `/plans/[id]/verify`
-- [ ] Protocol display
-- [ ] Re-measure trigger
-- [ ] Predicted vs observed with the control comparison
-- [ ] Explicit "within interval / outside interval" verdict, no causal language
+The headline is a **comparison, not a number**: share of benefit reaching the most
+vulnerable deciles set against their share of the population. "63% of benefit
+reaches vulnerable areas" sounds impressive and means nothing until you know they
+are 36% of the district — which is what makes the plan demonstrably progressive.
+
+Deciles receiving *zero* benefit are called out in prose. A bar chart renders zero
+as an invisible sliver, and "no block there was cost-effective enough within the
+budget" is a real planning fact a reader needs.
+
+### ✅ Task 13 · Verify (SRS screen #9) · `/plans/[id]/verify` — DONE
+- [x] Protocol display, with the pre-commitment argument stated
+- [x] Re-measure trigger
+- [x] Predicted vs observed with the control comparison
+- [x] "Within the predicted range" verdict — never "the plan worked"
+
+The difference-in-differences is shown **decomposed**, not as one figure. Showing
+only the result asks the reader to trust that controls were subtracted; showing
+both changes lets them check it. Verified in-browser that the displayed −3.1 °C
+recomputes exactly from the four temperatures above it.
+
+The weather component gets its own callout: the controls warmed 0.6 °C with no
+intervention, so without subtracting them the plan would appear to have delivered
+2.5 °C instead of 1.9 °C. That 0.6 °C is precisely what a naive before/after would
+have credited to the intervention.
 
 ### Task 14 · Not in the SRS screen table — decide before building
 Two Stitch pages exist as empty folders with no SRS screen behind them:

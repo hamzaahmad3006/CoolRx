@@ -49,6 +49,9 @@ export function AppShell({
   const theme = useAppSelector((state) => state.ui.theme);
   const railCollapsed = useAppSelector((state) => state.ui.railCollapsed);
   const dataMode = useAppSelector((state) => state.session.dataMode);
+  // Plan-scoped rail entries stay disabled until a plan exists, rather than
+  // linking to a route that cannot resolve.
+  const currentPlanId = useAppSelector((state) => state.session.currentPlanId);
 
   const isDark = theme === 'dark';
 
@@ -56,6 +59,7 @@ export function AppShell({
     <div className={cn('flex h-screen overflow-hidden bg-canvas', isDark && 'dark')}>
       <LeftRail
         projectId={projectId}
+        planId={currentPlanId}
         districtName={districtName}
         districtContext={districtContext}
         collapsed={railCollapsed}
