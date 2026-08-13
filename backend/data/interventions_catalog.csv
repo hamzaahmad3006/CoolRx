@@ -1,37 +1,25 @@
-# CoolRx intervention catalog — DATA REQUIRED BEFORE THE OPTIMIZER CAN RUN
+# CoolRx intervention catalog
 #
-# This file intentionally ships with no data rows.
+# Every row's unit cost and effect range must be traceable to a published source,
+# and the citation is reproduced verbatim in the report a city planner reads. The
+# database, the loader and the startup gate each reject an empty citation.
 #
-# SRS §11.4 states that this document does not supply unit costs or effect
-# sizes, because inventing plausible-looking constants would violate principle
-# P1 (never present an unsourced number as a finding) at the seeding layer.
-# Every value below must be traceable to a published source, and the citation is
-# reproduced verbatim in the report appendix a city planner reads.
+# STATUS: one fully-sourced row. See data/CATALOG-RESEARCH.md for candidate rows
+# whose cost is sourced but whose effect size is not yet confirmed from the paper
+# itself. Those are deliberately NOT included here — a row needs both.
 #
-# Columns (all required, order is not significant):
-#
-#   code                 stable identifier, snake_case, e.g. street_tree_medium
-#   category             one of: water | green | shade | material
-#   name                 human label shown in the UI
-#   unit                 the unit `quantity` is counted in, e.g. tree, m2, unit
+# Columns:
+#   code / category (water|green|shade|material) / name / unit
 #   unit_cost_usd        installed capital cost per unit, USD
-#   delta_c_low          most conservative published cooling effect, °C, NEGATIVE
-#   delta_c_high         least conservative published cooling effect, °C, NEGATIVE
+#   delta_c_low          most conservative published cooling, °C, NEGATIVE
+#   delta_c_high         least conservative published cooling, °C, NEGATIVE
 #                        must satisfy delta_c_low < delta_c_high
-#                        (e.g. low = -2.50, high = -0.40)
-#   lifespan_years       service life used for annualised cost, integer > 0
+#   lifespan_years       service life for annualised cost, integer > 0
 #   maintenance_usd_yr   recurring cost per unit per year, USD
-#   feasibility_rule     JSON object of tile-feature preconditions, {} if none
-#                        e.g. {"max_canopy_pct": 40, "min_impervious_pct": 30}
-#   source_citation      full citation. MUST NOT BE EMPTY — the database, the
-#                        loader and the startup gate each reject an empty value.
+#   feasibility_rule     JSON of tile-feature preconditions, {} if none
+#   source_citation      full provenance, including any scaling assumption
 #
-# Sign convention: cooling is negative, matching ΔT = counterfactual − baseline
-# everywhere else in the system. A positive delta would describe warming.
-#
-# Example of the expected shape (commented out — the numbers are placeholders,
-# not sourced values, and must not be used):
-#
-# street_tree_medium,green,Medium street tree,tree,450.00,-2.50,-0.40,30,35.00,"{""max_canopy_pct"": 40}","Author, A. (Year). Title. Journal, vol(issue), pages. DOI"
+# Sign convention: cooling is negative, matching ΔT = counterfactual − baseline.
 #
 code,category,name,unit,unit_cost_usd,delta_c_low,delta_c_high,lifespan_years,maintenance_usd_yr,feasibility_rule,source_citation
+street_tree_medium,green,Medium street tree,tree,3300.00,-1.78,-0.51,30,0.00,"{""max_canopy_pct"": 40}","COST: New York City Parks Department, average cost to plant one street tree in Fiscal Year 2024 = USD 3300, inclusive of site survey, sidewalk/stump work, nursery stock and two years of contractor maintenance (reported in Crain's New York Business, C. Spivak, 2024; summarised at https://forestforall.nyc/costs-city-plant-tree-why/). Maintenance is entered as 0 because the two-year maintenance contract is already inside the capital figure. NYC is a high-cost jurisdiction; substitute a local figure before using this outside New York. EFFECT: Locke DH, Baker M, Alonzo M, et al. Variation in the relationship between urban tree canopy and air temperature reduction under a range of daily weather conditions. Heliyon 2024;10(3):e25041. doi:10.1016/j.heliyon.2024.e25041. Reported air-temperature reductions associated with canopy cover range from -0.51 C (cloudy afternoon) to -1.78 C (clear afternoon, hottest quartile of days). ASSUMPTION: that range is measured against a large canopy-cover difference, not per tree, so applying it here assumes the per-block planting quantity achieves a substantial canopy increase on the treated block. Predictions are clamped to this range, and the range is the interval shown to the user."

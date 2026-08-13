@@ -215,16 +215,51 @@ def test_violation_reports_its_row_number(tmp_path: Path) -> None:
 # ── The shipped file ────────────────────────────────────────────────────────
 
 
-def test_shipped_catalog_has_the_required_header() -> None:
-    """The shipped CSV has no data rows by design, but must parse.
+def _shipped() -> Path:
+    return Path(__file__).resolve().parents[1] / "data" / "interventions_catalog.csv"
 
-    This is the guard on the file itself: it proves the header contract is
-    intact and that the commented example never becomes a live row.
+
+def test_shipped_catalog_parses_without_violations() -> None:
+    """The guard on the file itself.
+
+    It parses, the header contract is intact, and the commented example rows
+    never became live data.
     """
-    path = Path(__file__).resolve().parents[1] / "data" / "interventions_catalog.csv"
-    rows, violations = read_catalog_csv(path)
-    assert violations == []
-    assert rows == [], (
-        "the shipped catalog must stay empty — populate it from published "
-        "sources, do not commit placeholder numbers"
-    )
+    _rows, violations = read_catalog_csv(_shipped())
+    assert violations == [], [str(v) for v in violations]
+
+
+def test_every_shipped_row_carries_a_substantive_citation() -> None:
+    """Not merely non-empty.
+
+    Every automated check in this codebase tests that a citation *exists*, not
+    that it says anything. A row citing "TODO" would pass all of them, so this
+    asserts the citation is long enough to identify a source and names one.
+    """
+    rows, _ = read_catalog_csv(_shipped())
+    for row in rows:
+        citation = row.source_citation
+        assert len(citation) > 60, f"{row.code}: citation is too short to be real"
+        assert any(
+            marker in citation.lower()
+            for marker in ("doi:", "http", "department", "epa", "journal")
+        ), f"{row.code}: citation names no identifiable source"
+
+
+def test_no_shipped_row_uses_the_placeholder_numbers_from_the_template() -> None:
+    """The commented example in the file header must never go live.
+
+    Its figures are illustrative, not sourced, and copying them in would be the
+    exact failure the whole citation chain exists to prevent.
+    """
+    rows, _ = read_catalog_csv(_shipped())
+    for row in rows:
+        placeholder = (
+            row.code == "street_tree_medium"
+            and row.unit_cost_usd == Decimal("450.00")
+            and row.delta_c_low == Decimal("-2.50")
+        )
+        assert not placeholder, (
+            "this row matches the template's illustrative numbers exactly — "
+            "replace them with sourced figures"
+        )

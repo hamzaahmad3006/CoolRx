@@ -169,11 +169,16 @@ All ten SRS screens are built. Every backend pipeline module exists and is teste
 
 Two things cannot be resolved by writing code, and both are deliberate:
 
-**Intervention catalog.** `backend/data/interventions_catalog.csv` ships with **no data
-rows**. Every unit cost and effect size must carry a real citation, enforced by a
-database CHECK, a loader validator, and a startup gate that refuses to boot without
-one. Inventing plausible constants would violate the project's central rule at the
-seeding layer. Populate it, then:
+**Intervention catalog.** `backend/data/interventions_catalog.csv` currently holds
+**one fully-sourced row** — street trees, with the cost from NYC Parks FY2024 and the
+effect range from Locke et al. 2024 in *Heliyon*. Both were confirmed by reading the
+source, not a search summary.
+
+Candidate rows whose cost is sourced but whose effect size is not yet confirmed are
+held in [`backend/data/CATALOG-RESEARCH.md`](backend/data/CATALOG-RESEARCH.md) rather
+than added, because a row needs both halves. That file lists exactly which paper to
+obtain for each. Cool roofs are one confirmation away; cool pavement carries a real
+trade-off worth reading before it is included at all.
 
 ```bash
 cd backend && python -m scripts.load_catalog
