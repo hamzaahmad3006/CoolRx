@@ -14,7 +14,7 @@ import { useLanding } from './useLanding';
  * rather than Stitch's Material-3 names.
  */
 export function LandingPage() {
-  const { presets, workflow, openDistrict, openMethods } = useLanding();
+  const { presets, workflow, openDistrict, openMethods, openStudio } = useLanding();
 
   return (
     <div
@@ -72,6 +72,10 @@ export function LandingPage() {
               }}
             >
               Load Phoenix district
+            </Button>
+            {/* Without this the Studio is reachable only by typing its URL. */}
+            <Button variant="secondary" icon="placeAoi" onClick={openStudio}>
+              Choose your own area
             </Button>
             <Button variant="secondary" onClick={openMethods}>
               How it works
