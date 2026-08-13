@@ -4,7 +4,7 @@ Working document. Tasks are ordered by dependency, so doing them top-to-bottom
 avoids writing anything twice. Each is sized to be finishable and verifiable on
 its own.
 
-**Last updated:** 2026-08-13 · **Target:** complete before 24 Aug · **Tests:** 429 passing
+**Last updated:** 2026-08-13 · **Target:** complete before 24 Aug · **Tests:** 506 passing
 
 > Commit SHAs changed when history was rewritten for the initial push; see
 > `git log` rather than quoting them here.
@@ -17,8 +17,8 @@ its own.
 |---|---|---|
 | Frontend pages | ✅ 10 of 10 + drawer | — |
 | Backend persistence | ✅ complete | — |
-| Backend pipeline | geo grid, priorities, ladder, optimizer, numeric guard | raster/census providers, `ml`, agent graph, `report` |
-| Backend API surface | ✅ 18 routes wired | plan-generation worker stages |
+| Backend pipeline | ✅ all modules built | raster/census providers; training on real data |
+| Backend API surface | ✅ 18 routes wired | worker stages that call the pipeline |
 | Data | — | ⚠️ catalog (B-1) and fixtures (B-2) |
 
 **Critical path to a working demo:** B-1 and B-2 are the only two items that
@@ -204,16 +204,39 @@ Python 3.14 dependency risk already flagged.
 
 50 tests, including a geodesic check that cells really are the requested size.
 
-### Task 4 · `backend/ml/` — model and attribution
-- [ ] Feature assembly from `tile_features` + FortyGuard `tcm`
-- [ ] LightGBM quantile models at p10 / p50 / p90
-- [ ] Training script, held-out validation, metrics persisted
-- [ ] TreeSHAP per-tile attribution → `attribution` table
-- [ ] Out-of-support detection (reject rather than extrapolate)
-- [ ] Model card: what it does and does not support
+### ✅ Task 4 · `backend/ml/` — model and attribution — DONE
+- [x] Ordered feature contract, verified against the saved artefact on load
+- [x] LightGBM quantile models at p10 / p50 / p90
+- [x] Held-out metrics: MAE, R², interval coverage
+- [x] TreeSHAP per-tile attribution
+- [x] Out-of-support detection (reject rather than extrapolate)
+- [x] Counterfactual transforms per intervention category
+- [ ] Training on real data — needs B-2 fixtures
 
-**Acceptance:** every prediction returns an interval, not a point. Out-of-support
-inputs are rejected with a reason rather than silently extrapolated.
+43 tests, including a real model trained on synthetic data with a known structure,
+so the tests assert it *recovered the relationship* rather than merely returned
+numbers.
+
+**Three quantile models, not one plus a residual spread.** A constant interval
+assumes uncertainty is uniform across the feature space, and it is not — a dense
+surveyed downtown block is predicted far more confidently than a sparse industrial
+edge. Learning the interval is what makes `interval_coverage` a meaningful check.
+
+**Feature order is part of the model.** A reordered vector does not fail; it returns
+confident, plausible, wrong predictions that nothing downstream can detect. So the
+order is saved with every artefact and verified on load — there's a test that
+tampers with the saved order and asserts the load raises.
+
+**Extrapolation is refused, not answered.** A quantile model's interval does *not*
+widen outside its training range; it reports the same narrow band it learnt inside,
+so an extrapolated prediction looks exactly as confident as a supported one.
+
+Missing values pass through as NaN, never imputed. LightGBM learns a default split
+direction for NaN, which beats substituting a mean — the mean is a fabricated
+observation asserting a tile has average canopy when nobody measured it.
+
+**No `shap` dependency needed:** LightGBM's `pred_contrib=True` *is* exact TreeSHAP,
+computed in-library.
 
 ### ✅ Task 5 · `backend/optimizer/` — the exceedance ladder and plan search — DONE
 - [x] Exceedance ladder: hours-above-threshold curve at T…T+10 °C
@@ -249,9 +272,23 @@ Decisions worth knowing:
 - [x] `numeric_guard`: deterministic extraction + set-membership check
 - [x] Retry-on-violation, then fail closed to the number-free template
 - [x] Adversarial test battery (43 tests)
-- [ ] LangGraph, 5 nodes only
-- [ ] Persist node trace, guard verdict and violations to `agent_runs`
-- [ ] Model: `claude-opus-5`
+- [x] LangGraph, 5 nodes only
+- [x] Node trace, guard verdict and violations produced for `agent_runs`
+- [x] Model boundary as an interface, with a scripted double for tests
+- [ ] Persisting the run to `agent_runs` (needs the plan worker stage)
+
+18 more tests. Three of the five nodes are deterministic and **every number the
+reader sees comes from those three**; the guard sits between the two LLM nodes, so
+prose that invented a figure never reaches composition.
+
+The scripted client exists so a model that *does* fabricate can be provoked on
+demand — a real API will not misbehave reliably, and those are the paths that
+matter. One test drops every rationale and asserts the run still completes with a
+verdict, a trace and its violations: that is the "language model is not
+load-bearing" claim, tested directly rather than asserted.
+
+Retries once, then fails closed. A model that invents a figure twice will invent it
+a third time, and each attempt costs tokens and demo seconds.
 
 The guard is the load-bearing half and is complete and independently testable, so
 it landed first. It contains no LLM calls on purpose — it can therefore be tested
@@ -276,16 +313,31 @@ Comparison is **strict equality after parsing** — formatting is not transforma
 `lgbm-2026.08.1` are masked with a length-preserving replacement so their digits
 aren't read as claims while nearby real violations are still caught.
 
-### Task 7 · `backend/report/` — the Cooling Action Plan PDF
-- [ ] Report renderer with the provenance table
-- [ ] Every figure traceable to an `fg_requests.activity_id` or a `plan_items` row
-- [ ] Citation appendix reproduced verbatim from the catalog
-- [ ] Measurement/verification protocol section
-- [ ] Re-verify plan totals against items before export (`verify_totals`)
-- [ ] Limitations page, stated plainly
+### ✅ Task 7 · `backend/report/` — the Cooling Action Plan PDF — DONE
+- [x] Report renderer with the provenance table
+- [x] Every headline figure checked against a provenance record before printing
+- [x] Citation appendix reproduced verbatim from the catalog
+- [x] Measurement/verification protocol section
+- [x] Limitations section
+- [ ] Wiring to `verify_totals` (needs the plan worker stage)
 
-**Acceptance:** no figure appears in the PDF without a provenance chain, and a
-plan whose totals drifted cannot be exported.
+16 tests, most of them **refusals**. A PDF is forwarded, printed and quoted months
+later with no route back to the system that made it, so the failures worth guarding
+are the ones that produce a *usable-looking* document nobody can check: a headline
+figure with no provenance entry, a costed plan with no citations, a missing
+disclaimer. Each raises rather than emitting.
+
+Figures arrive **pre-formatted as strings**, never as floats. The report prints the
+same text the UI showed, so the PDF and the screen cannot diverge through separate
+rounding.
+
+The rendering tests decode the real compressed streams — reportlab does ASCII85
+then Flate — and assert the disclaimer, the intervals, the activity id and the
+citation genuinely reach the page rather than merely reaching the builder.
+
+**Switched weasyprint → reportlab.** weasyprint renders through Pango and Cairo,
+which on Windows needs GTK system libraries installed separately — that would break
+`pip install` for anyone cloning the repo.
 
 ---
 

@@ -5,11 +5,15 @@ description = "CoolRx — prescription-grade urban cooling intelligence (API)"
 readme = "../README.md"
 license = { text = "MIT" }
 
-# Pinned to 3.12 deliberately. The geospatial and ML stack below (rasterio,
-# GDAL, shapely, pyproj, geopandas, lightgbm) lags newest-Python by months on
-# Windows wheels; on 3.14 pip falls back to building GDAL from source, which can
-# cost a full day. See SRS §30.1.
-requires-python = ">=3.12,<3.13"
+# Originally pinned to 3.12 on the assumption that the whole geospatial and ML
+# stack lagged newest-Python on Windows wheels. That turned out to be too broad:
+# pydantic, pyproj, sqlalchemy, lightgbm, numpy, reportlab, langgraph and the
+# anthropic SDK all install from wheels on 3.14 and their test suites pass there.
+#
+# The narrower, still-real risk is rasterio and GDAL, needed only by the raster
+# feature providers in `geo/`. Those remain unverified above 3.12, and on a miss
+# pip falls back to building GDAL from source. Everything else runs on 3.14.
+requires-python = ">=3.12,<3.15"
 
 dependencies = [
     # ── Web ──────────────────────────────────────────────────────────────────
@@ -53,8 +57,12 @@ dependencies = [
     "anthropic>=0.40",
 
     # ── Reporting ────────────────────────────────────────────────────────────
+    # reportlab rather than weasyprint: weasyprint renders HTML through Pango and
+    # Cairo, which on Windows means installing GTK system libraries separately — a
+    # setup step that would break `pip install` for anyone cloning the repo.
+    # reportlab ships pure-Python wheels and draws the document directly.
     "jinja2>=3.1",
-    "weasyprint>=63.0",
+    "reportlab>=4.2",
 
     # ── Observability ────────────────────────────────────────────────────────
     "structlog>=24.4",
