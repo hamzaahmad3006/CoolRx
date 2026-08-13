@@ -4,7 +4,7 @@ Working document. Tasks are ordered by dependency, so doing them top-to-bottom
 avoids writing anything twice. Each is sized to be finishable and verifiable on
 its own.
 
-**Last updated:** 2026-08-13 · **Branch:** `feature/geo-guard-attribution` · **Tests:** 382 passing
+**Last updated:** 2026-08-13 · **Target:** complete before 24 Aug · **Tests:** 429 passing
 
 > Commit SHAs changed when history was rewritten for the initial push; see
 > `git log` rather than quoting them here.
@@ -15,11 +15,15 @@ its own.
 
 | Layer | Done | Remaining |
 |---|---|---|
-| Frontend pages | 4 of 10 + drawer | 6 screens |
+| Frontend pages | 7 of 10 + drawer | Impact & Equity, Action Plan, Verify |
 | Backend persistence | ✅ complete | — |
-| Backend pipeline | geo grid, priorities, numeric guard | raster/census providers, `ml`, `optimizer`, agent graph, `report` |
-| Backend API surface | ✅ 18 routes wired | — |
+| Backend pipeline | geo grid, priorities, ladder, optimizer, numeric guard | raster/census providers, `ml`, agent graph, `report` |
+| Backend API surface | ✅ 18 routes wired | plan-generation worker stages |
 | Data | — | ⚠️ catalog (B-1) and fixtures (B-2) |
+
+**Critical path to a working demo:** B-1 and B-2 are the only two items that
+cannot be resolved by writing code. Everything downstream of them is built and
+tested; they need published sources and an API key respectively.
 
 ---
 
@@ -211,21 +215,35 @@ Python 3.14 dependency risk already flagged.
 **Acceptance:** every prediction returns an interval, not a point. Out-of-support
 inputs are rejected with a reason rather than silently extrapolated.
 
-### Task 5 · `backend/optimizer/` — the exceedance ladder and plan search
-**Depends on:** B-1 (catalog data), Task 3, Task 4.
+### ✅ Task 5 · `backend/optimizer/` — the exceedance ladder and plan search — DONE
+- [x] Exceedance ladder: hours-above-threshold curve at T…T+10 °C
+- [x] Δhours = ladder(T) − ladder(T+|ΔT|), with linear interpolation between rungs
+- [x] Person-heat-hours = population × hours; `None` when population is unknown
+- [x] Equity weighting `PHH × (1 + λ·SVI)`, λ supplied by the caller
+- [x] Catalog-based ΔT estimator, with the model estimator pluggable behind it
+- [x] Clamp ΔT — and its interval — to the cited `[delta_c_low, delta_c_high]`
+- [x] Greedy marginal-benefit-per-dollar selection under the budget
+- [x] Feasibility rules per tile, with the exclusion reason returned
+- [x] Area-weighted district mean, diluted by untreated tiles
 
-- [ ] Exceedance ladder: 11 cached `exceedance` calls at T…T+10 °C
-- [ ] Δhours = ladder(T) − ladder(T+ΔT), under the stated uniform-diurnal-shift assumption
-- [ ] Person-heat-hours = population × hours-above-threshold
-- [ ] Equity weighting `PHH × (1 + λ·SVI)`, λ surfaced as a policy choice not a constant
-- [ ] Counterfactual feature transforms per intervention
-- [ ] Clamp ΔT to the catalog's cited `[delta_c_low, delta_c_high]`
-- [ ] Greedy marginal-benefit-per-dollar selection under the budget
-- [ ] Feasibility rules per tile
-- [ ] Label every counterfactual a planning-grade estimate under stated assumptions
+47 tests. Runs today without B-1 or Task 4, because **ΔT comes from the catalog's
+cited effect range** — the midpoint as the estimate, the published range as the
+interval. That is not a stopgap: a cited effect size from published literature is a
+legitimate, traceable planning input satisfying P1 and P2 exactly as a model
+prediction would. The model estimator refines it per-tile later.
 
-**Acceptance:** a plan never exceeds budget, every ΔT is clamped to a cited range,
-and no output claims an intervention *caused* a measured reduction.
+Decisions worth knowing:
+- **A missing ladder rung means no ladder for that tile**, not an interpolated one.
+  Filling the gap would put a fabricated measurement where a real one is absent, and
+  every figure downstream would inherit it undetectably.
+- **Non-monotonic rungs are clamped and logged.** Hours cannot rise with threshold;
+  propagating that artefact yields a *negative* hours-avoided figure showing an
+  intervention making things worse.
+- **Cooling beyond the ladder's top rung is refused**, not extrapolated.
+- **One intervention per tile.** Stacking would double count — the ladder converts a
+  single ΔT, not a sum of overlapping effects nobody measured.
+- **Greedy, deliberately.** ΔT spans a factor of several; optimising exactly against
+  numbers that soft is false precision, and every pick is explainable in a sentence.
 
 ### 🟡 Task 6 · `backend/agent/` — numeric guard DONE, graph remaining
 - [x] `numeric_guard`: deterministic extraction + set-membership check
@@ -297,12 +315,27 @@ The donut draws its unmeasured remainder as a hatched arc rather than normalisin
 the slices to 100%. Normalising would invent composition data — the fixture keeps
 `buildingPct` null precisely so that path is exercised on every open.
 
-### Task 9 · AOI Studio (SRS screen #2) · `/studio`
-- [ ] Draggable/resizable AOI box on the map
-- [ ] Live geodesic area badge against the plan cap
-- [ ] Date / hour / granularity / threshold pickers
-- [ ] Client-side pre-validation mirroring the backend guards (US coverage, ≤ cap, date floor)
-- [ ] Credit-cost preview before submit
+### ✅ Task 9 · AOI Studio (SRS screen #2) · `/studio` — DONE
+- [x] Click-to-place AOI box with a size slider
+- [x] Live geodesic area badge against the plan cap
+- [x] Date / hour / granularity / threshold pickers
+- [x] Client-side pre-validation mirroring the backend guards
+- [x] Credit and block-count preview before submit
+- [x] Linked from Landing — it was otherwise reachable only by typing the URL
+
+**Two sources of truth for area, handled explicitly.** The local check uses a
+spherical approximation for instant feedback on every slider move; the server
+re-checks on the WGS84 ellipsoid once it settles and its answer replaces the local
+one. Near the cap they can disagree, so while the server has not answered the page
+says the figure is an estimate rather than claiming a verdict.
+
+Click-to-place plus a slider rather than corner handles: the API takes a
+capped-area bounding box, so position and size are the only meaningful degrees of
+freedom — handles would let a user build a long thin sliver that satisfies the cap
+while being useless as a district.
+
+Does **not** use `AppShell`: the Studio runs before a project exists, and the rail
+builds per-project links, so it would emit `/p//diagnose`.
 
 ### Task 10 · Cooling Action Plan (SRS screen #8) · `/plans/[id]`
 - [ ] Report preview
@@ -311,11 +344,24 @@ the slices to 100%. Normalising would invent composition data — the fixture ke
 - [ ] Measurement plan section
 - [ ] Provenance table
 
-### Task 11 · Agent Trace + Methods (SRS screen #10) · `/trace/[id]`, `/methods`
-- [ ] Node-by-node execution log
-- [ ] Guard verdict and any violations, shown not hidden
-- [ ] Model validation metrics
-- [ ] Limitations page
+### ✅ Task 11 · Agent Trace + Methods (SRS screen #10) — DONE
+- [x] Node-by-node execution log, each labelled deterministic or language-model
+- [x] Guard verdict and violations, shown not hidden
+- [x] Model validation metrics with an interval-coverage callout
+- [x] Limitations, in two lists
+
+The trace fixture shows a run where the guard **caught a violation and retried**,
+not a clean one. A page that only ever displays "pass" proves nothing — the reason
+it exists is to show the mechanism firing, and a reader can only judge that by
+seeing it. The offending token is shown with its surrounding sentence, because the
+token alone cannot distinguish an invented figure from a reformatted allowed one.
+
+Interval coverage gets its own callout: it is the number that decides whether every
+other interval on the site can be believed. Below ~80% the page says the ranges are
+narrower than the real uncertainty rather than presenting them as calibrated.
+
+Limitations are split into methodology caveats (permanent) and model-card caveats
+(version-specific). Merging them would let a version bump quietly drop a permanent one.
 
 ### Task 12 · Impact & Equity (SRS screen #7, P1) · `/p/[id]/equity`
 - [ ] Vulnerable-group breakdown

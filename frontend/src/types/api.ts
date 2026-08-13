@@ -6,6 +6,7 @@
 import type {
   AgentRun,
   AnalyticRun,
+  AoiViolation,
   CreditStatus,
   Exposure,
   HealthStatus,
@@ -76,6 +77,24 @@ export interface CreateProjectFromPresetRequest {
 }
 
 export type CreateProjectResponse = Project;
+
+export interface ValidateAoiRequest {
+  readonly aoi: FgFeatureCollection;
+}
+
+/**
+ * Authoritative pre-flight result. `areaSqMi` is returned even when invalid —
+ * the Studio's size badge needs a number to show while the user is still
+ * dragging.
+ */
+export interface ValidateAoiResponse {
+  readonly isValid: boolean;
+  readonly areaSqMi: number;
+  readonly maxAreaSqMi: number;
+  readonly violations: readonly AoiViolation[];
+  /** Null when not computable — the ladder's cost depends on what is cached. */
+  readonly estimatedCredits: number | null;
+}
 
 export interface ListProjectsResponse {
   readonly presets: readonly Project[];

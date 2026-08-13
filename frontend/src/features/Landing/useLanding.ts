@@ -93,6 +93,7 @@ interface UseLandingResult {
   readonly workflow: readonly WorkflowStep[];
   readonly openDistrict: (presetId: string) => void;
   readonly openMethods: () => void;
+  readonly openStudio: () => void;
 }
 
 export function useLanding(): UseLandingResult {
@@ -111,10 +112,15 @@ export function useLanding(): UseLandingResult {
     router.push('/methods');
   }, [router]);
 
+  const openStudio = useCallback((): void => {
+    router.push('/studio');
+  }, [router]);
+
   return {
     presets: PRESET_DISTRICTS,
     workflow: WORKFLOW_STEPS,
     openDistrict,
     openMethods,
+    openStudio,
   };
 }

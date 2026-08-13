@@ -200,6 +200,14 @@ export const MAP = {
   controlHatch: '#8A8D91',
   /** Default fill opacity so basemap streets stay faintly legible. */
   tileFillOpacity: 0.75,
+  /** Map canvas behind the data, when no basemap tiles are configured. */
+  background: '#EFEEEA',
+  /** AOI box in the Studio, while it satisfies every limit. */
+  aoiFill: '#2B4A61',
+  aoiLine: '#1F3849',
+  /** AOI box once it breaks a limit. Distinct from the heat ramp so it cannot be
+   *  mistaken for a temperature reading. */
+  aoiInvalid: '#A3231F',
 } as const;
 
 /* ─────────────────────────────────────────────────────────────────────────────

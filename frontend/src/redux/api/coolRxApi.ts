@@ -24,6 +24,8 @@ import type {
   ProvenanceResponse,
   StatsResponse,
   TilesResponse,
+  ValidateAoiRequest,
+  ValidateAoiResponse,
   VerificationProtocolResponse,
   VerifyRequest,
   VerifyResponse,
@@ -70,6 +72,18 @@ export const coolRxApi = createApi({
     createProject: build.mutation<CreateProjectResponse, CreateProjectRequest>({
       query: (body) => ({ url: 'projects', method: 'POST', body }),
       invalidatesTags: ['Project'],
+    }),
+
+    /**
+     * Authoritative AOI pre-flight. Spends no credits and writes nothing, so the
+     * Studio can call it freely once the size slider settles.
+     *
+     * A mutation rather than a query despite being side-effect free: RTK Query
+     * keys a query's cache on its argument, and keying on a whole GeoJSON polygon
+     * would grow the cache on every drag.
+     */
+    validateAoi: build.mutation<ValidateAoiResponse, ValidateAoiRequest>({
+      query: (body) => ({ url: 'projects/validate-aoi', method: 'POST', body }),
     }),
 
     /* ── Diagnosis (async job) ─────────────────────────────────────────── */
@@ -204,6 +218,7 @@ export const {
   useListProjectsQuery,
   useGetProjectQuery,
   useCreateProjectMutation,
+  useValidateAoiMutation,
   useStartDiagnosisMutation,
   useGetJobQuery,
   useGetTilesQuery,
