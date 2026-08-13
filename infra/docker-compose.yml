@@ -46,6 +46,29 @@ services:
       timeout: 3s
       retries: 10
 
+  # ── One-shot: apply the schema, then exit ────────────────────────────────
+  #
+  # Its own service rather than an entrypoint step inside `api`, so two API
+  # replicas cannot race to run the same migration, and a failed migration shows
+  # as a failed container instead of a crash-looping API.
+  migrate:
+    profiles: ["api"]
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: coolrx-migrate
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://coolrx:coolrx@db:5432/coolrx
+      FIXTURE_MODE: "true"
+      LOG_FORMAT: console
+    volumes:
+      - ../backend:/app
+    command: ["alembic", "upgrade", "head"]
+    restart: "no"
+
   # ── Opt-in: run the API in Docker instead of on the host ─────────────────
   api:
     profiles: ["api"]
@@ -58,6 +81,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     environment:
       DATABASE_URL: postgresql+psycopg://coolrx:coolrx@db:5432/coolrx
       REDIS_URL: redis://redis:6379/0
@@ -83,6 +108,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     environment:
       DATABASE_URL: postgresql+psycopg://coolrx:coolrx@db:5432/coolrx
       REDIS_URL: redis://redis:6379/0

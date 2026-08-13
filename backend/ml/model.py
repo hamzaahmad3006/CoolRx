@@ -33,7 +33,6 @@ from .features import (
     check_support,
     observed_ranges,
     to_matrix,
-    to_vector,
 )
 
 log = structlog.get_logger(__name__)

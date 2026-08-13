@@ -6,11 +6,16 @@ discipline matters more than it looks — a task that raised without marking the
 failed would leave the frontend polling a job that will never change, which is
 indistinguishable from slow progress.
 
-Pipeline stages call into `geo`, `ml` and `optimizer`. Those modules are the subject
-of Tasks 3–5 and are not implemented yet, so a run currently fails at the first
-missing stage with a message naming it. That is deliberate: the alternative is
-inventing temperature data to make the pipeline appear to work, which would put
-fabricated numbers in front of the person evaluating the tool.
+A job ends in one of three states, and the distinction is load-bearing:
+
+  * **completed** — everything the run promised is present.
+  * **degraded** — usable results with something missing, and the reason is stored
+    so the UI shows a caveat rather than presenting a gap as complete.
+  * **failed** — nothing usable, with a message naming what to do about it.
+
+Nothing here substitutes a plausible value for a missing one. A run without
+land-cover data degrades and says so; it does not invent canopy percentages to make
+the pipeline appear to have worked.
 """
 
 from __future__ import annotations
@@ -19,18 +24,15 @@ import uuid
 
 import structlog
 
+from clients.fortyguard.errors import FortyGuardError
+from core.config import get_settings
 from repositories.base import session_scope
 from repositories.jobs import DIAGNOSE_STAGES, PLAN_STAGES, JobRepository
 
+from .pipeline import PipelineError, run_diagnose_pipeline
+from .plan_pipeline import PlanPipelineError, run_plan_pipeline
+
 log = structlog.get_logger(__name__)
-
-
-class StageNotImplementedError(RuntimeError):
-    """A pipeline stage whose module has not been built yet.
-
-    Distinct from a runtime failure so the job's error message can say what is
-    missing rather than reporting a generic crash.
-    """
 
 
 def _advance(job_id: uuid.UUID, stage: str, pct: int) -> None:
@@ -85,25 +87,48 @@ def run_diagnose(
         JobRepository(session).mark_running(job_id, stage=DIAGNOSE_STAGES[0][0])
 
     try:
-        _advance(job_id, "validating", 5)
-
-        # ── Stages below require the pipeline modules (Tasks 3-5) ─────────────
-        raise StageNotImplementedError(
-            "The temperature-fetch stage requires the geo module (Task 3) and a "
-            "FortyGuard API key. No fixtures are committed yet, so there is no "
-            "data to serve — see data/fixtures/README.md."
+        with session_scope() as session:
+            outcome = run_diagnose_pipeline(
+                session=session,
+                settings=get_settings(),
+                job_id=job_id,
+                project_id=project_id,
+                start_date=start_date,
+                start_time=start_time,
+                granularity=granularity,
+                threshold_c=threshold_c,
+                build_ladder_steps=build_ladder,
+            )
+    except FortyGuardError as exc:
+        # The upstream detail goes to the log; the user gets something actionable.
+        log.warning("diagnose.upstream_failed", job_id=job_id_str, detail=str(exc))
+        _fail(
+            job_id,
+            "The temperature service could not complete this analysis. Cached and "
+            "fixture data remain available.",
         )
-
-    except StageNotImplementedError as exc:
-        # Not marked degraded: degraded means partial-but-usable results, and there
-        # are no results here at all.
-        log.warning("diagnose.stage_missing", job_id=job_id_str, detail=str(exc))
+    except PipelineError as exc:
+        log.warning("diagnose.pipeline_error", job_id=job_id_str, detail=str(exc))
         _fail(job_id, str(exc))
     except Exception as exc:  # noqa: BLE001 — the job must reach a terminal state
         log.exception("diagnose.failed", job_id=job_id_str)
         _fail(job_id, f"{type(exc).__name__}: {exc}")
-    else:  # pragma: no cover — unreachable until the stages land
-        _complete(job_id)
+    else:
+        # `degraded` means usable-but-partial, and it is distinct from success so
+        # the UI shows the caveat rather than presenting a gap as complete.
+        if outcome.degraded_reason is not None:
+            _degrade(job_id, outcome.degraded_reason)
+        else:
+            _complete(job_id)
+
+        log.info(
+            "diagnose.finished",
+            job_id=job_id_str,
+            tiles=outcome.tile_count,
+            ladders=outcome.ladder_tiles,
+            attributed=outcome.attributed_tiles,
+            degraded=outcome.degraded_reason is not None,
+        )
 
 
 def run_plan(
@@ -130,16 +155,36 @@ def run_plan(
         JobRepository(session).mark_running(job_id, stage=PLAN_STAGES[0][0])
 
     try:
-        _advance(job_id, "loading_catalog", 10)
-        raise StageNotImplementedError(
-            "Plan generation requires the optimizer (Task 5), the trained model "
-            "(Task 4), and a populated intervention catalog."
-        )
-    except StageNotImplementedError as exc:
-        log.warning("plan.stage_missing", job_id=job_id_str, detail=str(exc))
+        with session_scope() as session:
+            outcome = run_plan_pipeline(
+                session=session,
+                settings=get_settings(),
+                job_id=job_id,
+                project_id=uuid.UUID(project_id_str),
+                budget_usd=budget_usd,
+                objective=objective,
+                equity_lambda=equity_lambda,
+                threshold_c=threshold_c,
+            )
+    except PlanPipelineError as exc:
+        # These messages name the missing piece — an empty catalog, no diagnosis,
+        # nothing affordable — because "plan generation failed" is unactionable.
+        log.warning("plan.precondition_failed", job_id=job_id_str, detail=str(exc))
         _fail(job_id, str(exc))
     except Exception as exc:  # noqa: BLE001
         log.exception("plan.failed", job_id=job_id_str)
         _fail(job_id, f"{type(exc).__name__}: {exc}")
-    else:  # pragma: no cover
-        _complete(job_id)
+    else:
+        if outcome.degraded_reason is not None:
+            _degrade(job_id, outcome.degraded_reason)
+        else:
+            _complete(job_id)
+
+        log.info(
+            "plan.finished",
+            job_id=job_id_str,
+            plan_id=str(outcome.plan_id),
+            items=outcome.item_count,
+            total_cost_usd=outcome.total_cost_usd,
+            infeasible=outcome.infeasible_count,
+        )
