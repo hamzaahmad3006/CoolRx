@@ -232,6 +232,27 @@ class ScriptedClient(LlmClient):
 # Prompts
 # ═════════════════════════════════════════════════════════════════════════════
 
+#: Units whose plural is not formed by adding "s". `m2` is a symbol, not a word.
+_PLURALS: Final[dict[str, str]] = {
+    "m2": "m²",
+    "linear_m": "linear metres",
+    "structure": "structures",
+    "station": "stations",
+    "tree": "trees",
+}
+
+
+def pluralise(unit: str, quantity: float) -> str:
+    """Unit as it should read next to a quantity.
+
+    A live run against Llama produced "includes 12 tree", because the prompt fed
+    the bare unit code. The model copies the phrasing it is given, so the fix
+    belongs here rather than in an instruction telling it to fix our grammar.
+    """
+    if quantity == 1:
+        return "m²" if unit == "m2" else unit.replace("_", " ")
+    return _PLURALS.get(unit, f"{unit.replace('_', ' ')}s")
+
 
 def rationale_prompt(
     *,
@@ -257,7 +278,7 @@ def rationale_prompt(
         f"Block {tile_key} was selected for the cooling plan.\n\n"
         f"Data:\n"
         f"- Intervention: {intervention_name}\n"
-        f"- Quantity: {quantity} {unit}\n"
+        f"- Quantity: {quantity} {pluralise(unit, quantity)}\n"
         f"- Cost: {cost_usd} USD\n"
         f"- Predicted temperature change: {predicted_delta_c} °C "
         f"(range {ci_low_c} to {ci_high_c})\n"
