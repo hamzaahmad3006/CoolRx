@@ -55,6 +55,9 @@ dependencies = [
     # ── Agent / LLM ──────────────────────────────────────────────────────────
     "langgraph>=0.2",
     "anthropic>=0.40",
+    # Alternative narration provider. Its free tier needs no card, which matters
+    # because a claude.ai subscription grants no API credit.
+    "groq>=0.11",
 
     # ── Reporting ────────────────────────────────────────────────────────────
     # reportlab rather than weasyprint: weasyprint renders HTML through Pango and

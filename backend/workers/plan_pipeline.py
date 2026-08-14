@@ -314,18 +314,26 @@ def _narrate(
     plan_id: uuid.UUID,
     catalog_by_code: dict[str, InterventionCatalogEntry],
 ) -> str | None:
-    """Attach LLM rationales, if a key is configured.
+    """Attach LLM rationales, if a provider is configured.
 
     Returns a note when narration was skipped or degraded. A missing key is not an
     error — the plan is complete without prose, which is the point of the whole
     numeric-guard design.
     """
-    if settings.anthropic_api_key is None:
-        return "plan text was not generated (no language-model key configured)"
-
     from agent.graph import PlanItemInput as NarrationItem
     from agent.graph import PlanNarrator, PlanSummaryInput
-    from agent.llm import AnthropicClient
+    from agent.llm import build_client
+
+    client = build_client(
+        provider=settings.llm_provider,
+        anthropic_api_key=settings.anthropic_api_key,
+        groq_api_key=settings.groq_api_key,
+        anthropic_model=settings.llm_model,
+        groq_model=settings.groq_model,
+        max_tokens=settings.llm_max_tokens_rationale,
+    )
+    if client is None:
+        return "plan text was not generated (no language-model key configured)"
 
     plan = plans.get_with_items(plan_id)
     if plan is None:
@@ -365,13 +373,7 @@ def _narrate(
     ]
 
     try:
-        narrator = PlanNarrator(
-            AnthropicClient(
-                api_key=settings.anthropic_api_key,
-                model=settings.llm_model,
-                max_tokens=settings.llm_max_tokens_rationale,
-            )
-        )
+        narrator = PlanNarrator(client)
         run = narrator.run(
             plan_id=str(plan_id),
             items=narration_items,
