@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from agent.llm import AnthropicClient, GroqClient, build_client
+from agent.llm import AnthropicClient, GroqClient, build_client, pluralise
 
 
 def _build(**overrides: object) -> object:
@@ -90,6 +90,41 @@ def test_constructing_a_client_makes_no_network_call() -> None:
     without a key being validated, or a plan would fail before it started."""
     GroqClient(api_key="obviously-invalid", model="llama-3.3-70b-versatile")
     AnthropicClient(api_key="obviously-invalid", model="claude-opus-5")
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Prompt phrasing
+# ═════════════════════════════════════════════════════════════════════════════
+
+
+@pytest.mark.parametrize(
+    ("unit", "quantity", "expected"),
+    [
+        ("tree", 12, "trees"),
+        ("tree", 1, "tree"),
+        ("m2", 400, "m²"),
+        ("m2", 1, "m²"),
+        ("structure", 3, "structures"),
+        ("structure", 1, "structure"),
+        ("linear_m", 60, "linear metres"),
+        ("station", 2, "stations"),
+    ],
+)
+def test_units_read_naturally_next_to_a_quantity(
+    unit: str, quantity: float, expected: str
+) -> None:
+    """A live Groq run produced "includes 12 tree".
+
+    The model copies the phrasing the prompt gives it, so the fix belongs in the
+    prompt rather than in an instruction asking it to correct our grammar. This
+    text reaches a document a city department reads.
+    """
+    assert pluralise(unit, quantity) == expected
+
+
+def test_an_unknown_unit_still_pluralises_sensibly() -> None:
+    """A catalog unit added later must not read as "5 widget"."""
+    assert pluralise("widget", 5) == "widgets"
 
 
 def test_groq_config_defaults_name_a_real_production_model() -> None:
