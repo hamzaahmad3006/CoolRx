@@ -14,6 +14,7 @@ allowed set without reaching the prompt silently widens what the model may say.
 
 from __future__ import annotations
 
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Final
@@ -91,6 +92,113 @@ class AnthropicClient(LlmClient):
             tokens_in=message.usage.input_tokens,
             tokens_out=message.usage.output_tokens,
         )
+
+
+class GroqClient(LlmClient):
+    """Groq-hosted open-weight models.
+
+    Chosen when there is no Anthropic credit: Groq's free tier covers a plan
+    comfortably at 30 requests/minute and 14,400/day, where one plan is roughly one
+    call per item plus a summary.
+
+    **The numeric guard matters more here, not less.** An 8B or 70B open-weight
+    model fabricates figures noticeably more often than a frontier model does, so
+    the retry-then-fail-closed path stops being theoretical and starts firing. That
+    is the design working rather than a reason to avoid the provider — the plan's
+    figures never came from the model, and the honesty panel shows what was caught.
+
+    Retries on 429 with backoff, because the free tier's 6,000 tokens/minute is a
+    real ceiling for a large plan and a rate-limited run should slow down rather
+    than lose a rationale to a transport error the guard would then blame on the
+    model.
+    """
+
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        model: str,
+        max_tokens: int = 1024,
+        max_retries: int = 3,
+    ) -> None:
+        self._api_key = api_key
+        self._model = model
+        self._max_tokens = max_tokens
+        self._max_retries = max_retries
+
+    @property
+    def model_name(self) -> str:
+        return self._model
+
+    def complete(self, *, system: str, prompt: str) -> LlmResponse:
+        import groq
+
+        client = groq.Groq(api_key=self._api_key)
+
+        last_error: Exception | None = None
+        for attempt in range(self._max_retries):
+            try:
+                completion = client.chat.completions.create(
+                    model=self._model,
+                    max_tokens=self._max_tokens,
+                    # Low but not zero. Deterministic output would repeat the same
+                    # sentence for every item in a plan, which reads as broken.
+                    temperature=0.3,
+                    messages=[
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": prompt},
+                    ],
+                )
+            except groq.RateLimitError as exc:
+                last_error = exc
+                delay = 2.0 * (2**attempt)
+                log.warning(
+                    "groq.rate_limited", attempt=attempt + 1, sleeping_s=delay
+                )
+                time.sleep(delay)
+                continue
+
+            choice = completion.choices[0]
+            usage = completion.usage
+            return LlmResponse(
+                text=(choice.message.content or "").strip(),
+                tokens_in=usage.prompt_tokens if usage else None,
+                tokens_out=usage.completion_tokens if usage else None,
+            )
+
+        raise RuntimeError(
+            f"Groq rate limit not cleared after {self._max_retries} attempts"
+        ) from last_error
+
+
+def build_client(
+    *,
+    provider: str,
+    anthropic_api_key: str | None,
+    groq_api_key: str | None,
+    anthropic_model: str,
+    groq_model: str,
+    max_tokens: int,
+) -> LlmClient | None:
+    """Pick a client from configuration, or None when narration is unavailable.
+
+    None rather than raising: prose is optional by design, so a missing key must
+    leave the plan intact rather than failing the run. `auto` prefers Anthropic and
+    falls back to Groq, so setting either key is enough.
+    """
+    normalised = provider.lower()
+
+    if normalised in {"anthropic", "auto"} and anthropic_api_key:
+        return AnthropicClient(
+            api_key=anthropic_api_key, model=anthropic_model, max_tokens=max_tokens
+        )
+    if normalised in {"groq", "auto"} and groq_api_key:
+        return GroqClient(
+            api_key=groq_api_key, model=groq_model, max_tokens=max_tokens
+        )
+
+    log.info("llm.no_client", provider=provider, detail="plans will carry no prose")
+    return None
 
 
 @dataclass(slots=True)

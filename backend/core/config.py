@@ -15,7 +15,7 @@ from datetime import date
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 Environment = Literal["development", "staging", "production"]
@@ -110,6 +110,13 @@ class Settings(BaseSettings):
     #: A fixture miss raises instead of silently falling through to a live call.
     fixture_strict: bool = True
 
+    # ── Language model ───────────────────────────────────────────────────────
+    #: Which provider narrates a plan. `auto` prefers Anthropic and falls back to
+    #: Groq, so setting either key is enough. `none` disables narration outright —
+    #: plans still generate, they just carry no prose, which is what the whole
+    #: numeric-guard design makes safe.
+    llm_provider: Literal["auto", "anthropic", "groq", "none"] = "auto"
+
     # ── Anthropic ────────────────────────────────────────────────────────────
     anthropic_api_key: str | None = None
     llm_model: str = "claude-opus-5"
@@ -121,6 +128,14 @@ class Settings(BaseSettings):
     llm_max_tokens_rationale: int = 2_000
     llm_enable_prompt_cache: bool = True
     llm_stream_report: bool = True
+
+    # ── Groq ─────────────────────────────────────────────────────────────────
+    #: Free tier at time of writing: 30 requests/minute, 14,400/day, 6,000
+    #: tokens/minute. A plan is roughly one call per item plus a summary, so a
+    #: typical run fits comfortably; a very large plan can brush the token
+    #: ceiling, which `GroqClient` handles by backing off rather than failing.
+    groq_api_key: str | None = None
+    groq_model: str = "llama-3.3-70b-versatile"
 
     # ── ML ───────────────────────────────────────────────────────────────────
     model_dir: str = "./models"

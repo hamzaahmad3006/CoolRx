@@ -54,6 +54,24 @@ docker compose -f infra/docker-compose.yml up -d
 cd backend && uv sync && alembic upgrade head && uvicorn main:app --reload
 ```
 
+### Keys
+
+Exactly one key is required, and it is not the language-model one.
+
+| Variable | Required? | Source |
+|---|---|---|
+| `FORTYGUARD_API_KEY` | **Yes**, for live data or capturing fixtures | Hackathon portal |
+| `GROQ_API_KEY` *or* `ANTHROPIC_API_KEY` | No | [console.groq.com](https://console.groq.com/keys) (free tier, no card) / [console.anthropic.com](https://console.anthropic.com) (prepaid credits) |
+| `DEMO_KEY` | Only in production | Any random string you choose |
+
+Set `LLM_PROVIDER=auto` and whichever language-model key you have; the app picks
+one. With neither, plans still generate — items simply carry no written rationale
+and the report says so. That is the point of the numeric guard: the model is not
+load-bearing, so its absence costs prose and nothing else.
+
+A claude.ai Free or Pro subscription grants **no** API credit — console billing is
+separate. Groq's free tier needs no card.
+
 ### Tests
 
 ```bash
