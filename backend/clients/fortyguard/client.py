@@ -39,7 +39,6 @@ from .errors import (
     CreditReserveExhausted,
     FortyGuardAuthError,
     FortyGuardConnectionError,
-    FortyGuardError,
     FortyGuardNotReadyError,
     FortyGuardPlanError,
     FortyGuardTaskFailed,

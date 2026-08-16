@@ -128,10 +128,10 @@ class DiagnoseController:
     def _assert_window_valid(self, request: DiagnoseRequest) -> None:
         """Reject an out-of-range measurement window before spending anything.
 
-        The date floor is contested — the docs say 2019-01-01 and the hackathon FAQ
-        says 2021-01-01 (SRS C-1) — so the validator uses the stricter bound from
-        configuration. A request below it is refused locally rather than sent to
-        find out.
+        The floor is 2019-01-01, confirmed by the official API documentation
+        (SRS C-1, previously contested against a 2021 figure in the hackathon FAQ).
+        A request below it is refused locally rather than sent to find out, because
+        the API rejects out-of-range dates with a 400 that still costs a round trip.
         """
         spec = DateTimeSpec(
             start_date=request.start_date,

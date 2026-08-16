@@ -70,9 +70,12 @@ class Settings(BaseSettings):
     #: 10 mi² on Basic/Startup, 50 on Premium.
     fg_max_aoi_sqmi: float = 10.0
 
-    #: Docs say 2019-01-01, the hackathon FAQ says 2021-01-01 (SRS C-1).
-    #: The stricter bound is the safe default until verified empirically.
-    fg_date_floor: date = date(2021, 1, 1)
+    #: RESOLVED (SRS C-1). The official API documentation states 2019-01-01 in two
+    #: places — "Supported range: 2019-01-01 through 12 hours past the current
+    #: time" — and says out-of-range dates are rejected with 400. The 2021 figure
+    #: in the hackathon FAQ was the outlier, and holding to it would have rejected
+    #: two extra years of valid history locally, before the API ever saw it.
+    fg_date_floor: date = date(2019, 1, 1)
 
     #: The API accepts only these three values, in metres.
     fg_granularity_options: tuple[int, ...] = (60, 80, 100)

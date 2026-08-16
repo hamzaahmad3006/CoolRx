@@ -131,7 +131,8 @@ class ValidationLimits:
     """Plan-dependent limits, injected so tests need no settings object."""
 
     max_aoi_sqmi: float = 10.0
-    date_floor: date = date(2021, 1, 1)
+    #: Confirmed by the official docs as 2019-01-01 (SRS C-1 resolved).
+    date_floor: date = date(2019, 1, 1)
     max_forecast_hours: int = 12
     granularity_options: tuple[int, ...] = (60, 80, 100)
     max_env_parameters: int | None = 3

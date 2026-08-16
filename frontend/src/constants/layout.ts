@@ -89,8 +89,8 @@ export const FG_LIMITS = {
   /** The API accepts only these three granularity values. */
   granularityOptions: [60, 80, 100] as const,
   defaultGranularity: 80,
-  /** Stricter of the two documented date floors (docs say 2019, FAQ says 2021). */
-  dateFloor: '2021-01-01',
+  /** Confirmed by the official API docs: 2019-01-01 through 12 h ahead. */
+  dateFloor: '2019-01-01',
   /** Forecast horizon — hard API limit. */
   maxForecastHours: 12,
   /** Danger threshold default, in °C. */

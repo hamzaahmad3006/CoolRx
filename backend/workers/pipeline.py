@@ -30,12 +30,15 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from clients.fortyguard.client import FortyGuardClient
+from clients.fortyguard.parsing import parse_heatmap, read_stat
 from core.config import Settings
 from geo import (
+    Tile as GridTile,
     apply_district_mean,
-    build_grid,
     default_providers,
     enrich_tiles,
+    estimate_tile_count,
+    tile_key,
 )
 from ml import (
     ModelNotTrained,
@@ -118,23 +121,31 @@ def run_diagnose_pipeline(
             start_time=start_time,
         )
 
-        grid, spec = build_grid(
+        # Our own grid is used only for the pre-flight tile estimate. The tiles the
+        # values attach to come from the API's `map_data`, because they are the
+        # ones the measurements were taken on.
+        expected = estimate_tile_count(
             west=west, south=south, east=east, north=north,
             granularity_m=granularity,
         )
-        log.info("pipeline.grid_built", tiles=spec.tile_count, epsg=spec.utm_epsg)
 
-        _persist_analytic(
+        _tcm_run, tcm_parsed = _persist_analytic(
             session=session,
             tiles_repo=tiles_repo,
             project_id=project_id,
-            grid=grid,
             result=tcm,
             analytic="tcm",
             granularity=granularity,
             start_date=start_date,
             start_time=start_time,
             threshold_c=None,
+        )
+        log.info(
+            "pipeline.tiles_received",
+            returned=len(tcm_parsed.tiles),
+            estimated=expected,
+            with_values=tcm_parsed.with_values,
+            value_key=tcm_parsed.value_key,
         )
 
         # ── Ladder ───────────────────────────────────────────────────────────
@@ -148,7 +159,6 @@ def run_diagnose_pipeline(
                 tiles_repo=tiles_repo,
                 project_id=project_id,
                 bounds=bounds,
-                grid=grid,
                 granularity=granularity,
                 start_date=start_date,
                 start_time=start_time,
@@ -162,9 +172,23 @@ def run_diagnose_pipeline(
         hour_utc = int(start_time.split(":")[0])
         doy = date.fromisoformat(start_date).timetuple().tm_yday
         providers = default_providers(hour_utc=hour_utc, doy=doy)
-        feature_rows, enrichment = enrich_tiles(grid, providers)
+        # Enriched against the API's tiles, so a feature row exists for exactly the
+        # tiles that carry a measurement.
+        enrichment_tiles = [
+            GridTile(
+                tile_key=tile_key(tile.centroid_lon, tile.centroid_lat),
+                west=tile.west,
+                south=tile.south,
+                east=tile.east,
+                north=tile.north,
+                centroid_lon=tile.centroid_lon,
+                centroid_lat=tile.centroid_lat,
+            )
+            for tile in tcm_parsed.tiles
+        ]
+        feature_rows, enrichment = enrich_tiles(enrichment_tiles, providers)
 
-        district_mean = _stat(tcm.result, "mean")
+        district_mean = read_stat(tcm.result, "mean")
         apply_district_mean(feature_rows, district_mean)
         tiles_repo.upsert_features(project_id=project_id, rows=feature_rows)
 
@@ -190,13 +214,13 @@ def run_diagnose_pipeline(
         degraded = _degradation_reason(
             enrichment_unavailable=enrichment.unavailable,
             attributed=attributed,
-            tile_count=len(grid),
+            tile_count=len(tcm_parsed.tiles),
             ladder_tiles=len(ladders),
             wanted_ladder=build_ladder_steps,
         )
 
         return DiagnoseOutcome(
-            tile_count=len(grid),
+            tile_count=len(tcm_parsed.tiles),
             ladder_tiles=len(ladders),
             attributed_tiles=attributed,
             degraded_reason=degraded,
@@ -259,7 +283,6 @@ def _persist_analytic(
     session: Session,
     tiles_repo: TileRepository,
     project_id: uuid.UUID,
-    grid: list[Any],
     result: Any,
     analytic: str,
     granularity: int,
@@ -278,6 +301,7 @@ def _persist_analytic(
         )
 
     stats = result.result.get("stats_data", {}) or {}
+    units = _units_of(result.result)
     run = tiles_repo.create_run(
         project_id=project_id,
         fg_request_id=fg_row.id,
@@ -289,63 +313,35 @@ def _persist_analytic(
         stats=stats,
         threshold_c=threshold_c,
         direction="above" if threshold_c is not None else None,
-        units=stats.get("units"),
+        units=units,
     )
 
-    values = _values_by_index(result.result)
+    # The API returns its own tile polygons, so values are attached to those rather
+    # than index-matched onto our generated grid. Index matching would silently
+    # mis-assign every temperature the moment their tiling differed from ours by a
+    # single cell, and nothing downstream could detect it.
+    parsed = parse_heatmap(result.result)
     rows = [
         TileRow(
-            tile_key=tile.tile_key,
+            tile_key=tile_key(tile.centroid_lon, tile.centroid_lat),
             west=tile.west,
             south=tile.south,
             east=tile.east,
             north=tile.north,
-            # None where the response had no value for this cell. Never zero.
-            value=values.get(index),
+            # None where the response carried no value for this cell. Never zero.
+            value=tile.value,
         )
-        for index, tile in enumerate(grid)
+        for tile in parsed.tiles
     ]
     tiles_repo.bulk_insert_tiles(
         project_id=project_id, analytic_run_id=run.id, rows=rows
     )
-    return run
+    return run, parsed
 
 
-def _values_by_index(payload: dict[str, Any]) -> dict[int, float | None]:
-    """Extract per-cell values from a heatmap response.
-
-    The response shape is not fully documented (SRS C-6), so several plausible
-    containers are tried and anything unrecognised yields no values rather than a
-    guess — an empty layer with a visible coverage figure beats a fabricated one.
-    """
-    for key in ("data", "values", "grid", "cells", "heatmap"):
-        candidate = payload.get(key)
-        if isinstance(candidate, list) and candidate:
-            out: dict[int, float | None] = {}
-            for index, item in enumerate(candidate):
-                if isinstance(item, (int, float)):
-                    out[index] = float(item)
-                elif isinstance(item, dict):
-                    for value_key in ("value", "temperature", "tcm", "hours"):
-                        raw = item.get(value_key)
-                        if isinstance(raw, (int, float)):
-                            out[index] = float(raw)
-                            break
-            if out:
-                return out
-
-    log.warning(
-        "pipeline.unrecognised_response_shape",
-        keys=sorted(payload)[:12],
-        detail="no per-cell values extracted; layer will be empty, not invented",
-    )
-    return {}
-
-
-def _stat(payload: dict[str, Any], name: str) -> float | None:
-    stats = payload.get("stats_data", {}) or {}
-    value = stats.get(name)
-    return float(value) if isinstance(value, (int, float)) else None
+def _units_of(payload: dict[str, Any]) -> str | None:
+    """Units as reported, never assumed (SRS C-4)."""
+    return parse_heatmap(payload).units
 
 
 def _build_ladders(
@@ -355,7 +351,6 @@ def _build_ladders(
     tiles_repo: TileRepository,
     project_id: uuid.UUID,
     bounds: tuple[float, float, float, float],
-    grid: list[Any],
     granularity: int,
     start_date: str,
     start_time: str,
@@ -380,11 +375,10 @@ def _build_ladders(
             start_time=start_time,
             threshold_c=rung_threshold,
         )
-        _persist_analytic(
+        _run, parsed = _persist_analytic(
             session=session,
             tiles_repo=tiles_repo,
             project_id=project_id,
-            grid=grid,
             result=result,
             analytic="exceedance",
             granularity=granularity,
@@ -393,30 +387,34 @@ def _build_ladders(
             threshold_c=rung_threshold,
         )
 
-        values = _values_by_index(result.result)
+        # Keyed by tile key, not by array position. Rungs are separate API calls
+        # and their tile ordering is not guaranteed to match; position-matching
+        # would build a ladder from eleven different places on the ground.
         by_step[step] = {
-            tile.tile_key: values.get(index) for index, tile in enumerate(grid)
+            tile_key(tile.centroid_lon, tile.centroid_lat): tile.value
+            for tile in parsed.tiles
         }
 
+    all_keys = set(by_step.get(0, {}))
     ladders: dict[str, TileLadder] = {}
-    for tile in grid:
+    for key in all_keys:
         ladder = build_ladder(
-            tile_key=tile.tile_key,
+            tile_key=key,
             base_threshold_c=threshold_c,
             hours_by_step={
-                step: values.get(tile.tile_key) for step, values in by_step.items()
+                step: values.get(key) for step, values in by_step.items()
             },
             steps=steps,
         )
         # None means a rung was missing. The tile is excluded from hours-avoided
         # accounting rather than being given an interpolated measurement.
         if ladder is not None:
-            ladders[tile.tile_key] = ladder
+            ladders[key] = ladder
 
     log.info(
         "pipeline.ladders_built",
         complete=len(ladders),
-        total=len(grid),
+        total=len(all_keys),
         steps=steps,
     )
     return ladders
