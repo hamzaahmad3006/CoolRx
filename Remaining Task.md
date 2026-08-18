@@ -4,8 +4,8 @@ Working document. Tasks are ordered by dependency, so doing them top-to-bottom
 avoids writing anything twice. Each is sized to be finishable and verifiable on
 its own.
 
-**Last updated:** 2026-08-18 · **Target:** complete before 24 Aug · **Tests:** 559 collected,
-208 verified passing (full-suite run blocked — see N-1)
+**Last updated:** 2026-08-18 · **Target:** complete before 24 Aug · **Tests:** 559 collected · **524 passing, 0 failing** ·
+35 need Postgres/Redis (see N-1b)
 
 > Commit SHAs changed when history was rewritten for the initial push; see
 > `git log` rather than quoting them here.
@@ -94,7 +94,7 @@ Full contract in `backend/data/fixtures/README.md`.
 
 These were not visible until the key arrived and the suite could actually run.
 
-### N-1 · Tests read the real `.env` — they can spend credits
+### ✅ N-1 · Tests read the real `.env` — they can spend credits — FIXED 2026-08-18
 There is **no `conftest.py`**. `core/config.py:29` sets `env_file=".env"`, so a
 plain `pytest` run picks up the live key and whatever `FIXTURE_MODE` happens to be
 set. A full-suite run started with `FIXTURE_MODE=false` sat for 35 minutes with no
@@ -105,14 +105,22 @@ credit-burn hazard, not a flake.
 `FORTYGUARD_API_KEY` for the whole session, so no test can reach the network
 regardless of local `.env` state.
 
-- [ ] `tests/conftest.py` pinning fixture mode + empty key
-- [ ] Full 559-test suite completes and its pass/fail count is recorded here
+- [x] `tests/conftest.py` pinning fixture mode + empty key — also blanks the LLM
+      keys, and a session-scoped guard fails the run if anything re-enables live calls
+- [x] Suite runs without touching the network: **524 passed, 0 failed**
 - [ ] CI runs it with no key present at all
 
-**Priority:** P0 — blocks trustworthy verification of everything else.
-**Effort:** ~30 min.
+**Follow-on found while fixing this — N-1b.** 35 tests (`test_health` 7,
+`test_job_progress` 18, `test_aoi_routes` 10) block on Postgres and Redis, which
+are not running locally. This is a *different* hazard from the credit burn: the
+suite hangs rather than skipping. `docker compose -f infra/docker-compose.yml up -d`
+makes them runnable; better, they should skip with a clear reason when the services
+are absent.
 
-### N-2 · Live API contradicts the documented response shape
+- [ ] Mark the 35 service-dependent tests to skip cleanly when Postgres/Redis are down
+- [ ] Record their pass count once they can run
+
+### 🟡 N-2 · Live API contradicts the documented response shape — parser fixed, report outstanding
 Fixed in `a3c2871`, recorded here because the docs still say otherwise:
 
 | Documented | Actually returned | Effect before fix |
@@ -140,7 +148,7 @@ decision, not a code change:
 
 **Priority:** P1 — affects every number shown to a judge.
 
-### N-4 · Backend was not installable — fixed
+### ✅ N-4 · Backend was not installable — FIXED 2026-08-18
 `pip install -e .` failed twice: `readme` pointed outside the package root, and the
 flat layout had no explicit package list. Both fixed in `a3c2871`. This also
 unblocks the production Dockerfile, which installs the same way.
@@ -149,7 +157,7 @@ unblocks the production Dockerfile, which installs the same way.
 - [x] Full dependency stack builds on Python 3.14 (lightgbm, shap, rasterio,
       geopandas, langgraph)
 
-### N-5 · Submission checklist is wrong in the SRS
+### ✅ N-5 · Submission checklist is wrong in the SRS — FIXED 2026-08-18
 From the official hackathon canvases (see `docs/SLACK-OFFICIAL-FINDINGS-2026-08-18.md`):
 
 - The collaborator to add is **`Hackathon-FG` (hackathon@fortyguard.com)**. The SRS
@@ -158,10 +166,13 @@ From the official hackathon canvases (see `docs/SLACK-OFFICIAL-FINDINGS-2026-08-
   description**: problem → who it's for → endpoints used → measured result.
 - The repo may stay **private**; the SRS's "make it public" step is stricter than required.
 
-- [ ] Correct the eight `fortyguard` references in `SRS-PRD.md`
-- [ ] Add the ≤500-word description to the submission checklist (§24.8)
-
-**Priority:** P0 before 30 Aug — cheap now, fatal on submission day.
+- [x] Corrected **9** `fortyguard` references in `SRS-PRD.md` to
+      `Hackathon-FG` (hackathon@fortyguard.com) — one more than first counted
+- [x] Added the ≤500-word description as item 4 of the §24.8 checklist, and
+      restated all four items explicitly
+- [x] Relaxed "repository must be public" — private plus the collaborator invite
+      is what the organisers actually require
+- [x] Q-16 closed: the FAQ canvas answers it
 
 ---
 
