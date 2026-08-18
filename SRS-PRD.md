@@ -195,7 +195,7 @@ This is deliberate. Overclaiming causality in front of domain-expert judges is t
 | G-05 | Every number traceable to its source | Execution, Innovation | Provenance table in PDF and `/api/plans/{id}/provenance` |
 | G-06 | Emit a pre-registered measurement plan | Innovation, Impact | Plan PDF contains executable re-measurement recipe |
 | G-07 | Deployed live demo | **REQUIRED by submission rules** | Public HTTPS URL loads a pre-baked district in <3 s |
-| G-08 | Public GitHub repo, `fortyguard` added as collaborator | **REQUIRED by submission rules** | Verified from a logged-out browser before submission |
+| G-08 | GitHub repo (public or private) with `Hackathon-FG` (hackathon@fortyguard.com) added as collaborator | **REQUIRED by submission rules** | Verified from a logged-out browser before submission |
 | G-09 | Judge-reproducible without an API key | Execution | `FIXTURE_MODE=true` + `make demo` runs the full pipeline offline |
 | G-10 | Honest model validation reported | Execution, AI safety | Grouped-by-district holdout metrics + matched-pair result published in UI and README |
 | G-11 | 2–3 minute demo that lands the value in the first 60 seconds | Communication | Recorded video; before/after view reached by 1:50 |
@@ -3049,7 +3049,7 @@ Executed on Day 12, before submitting:
 5. Public URL loads a preset district in <3 s from a logged-out browser on a different network.
 6. PDF downloads successfully from production.
 7. `FIXTURE_MODE=true` verified working on a clean clone (`git clone && make demo`).
-8. Repository is public; `fortyguard` added as a collaborator; verified from a logged-out session.
+8. `Hackathon-FG` (hackathon@fortyguard.com) added as a collaborator; access verified from a logged-out session. The repository may stay private — the collaborator invite is what grants judges access.
 9. README renders correctly on GitHub with the demo GIF visible.
 10. Demo video uploaded and playable.
 11. Cold start disabled (scale-to-zero off) for the judging window.
@@ -3543,7 +3543,7 @@ Chart rules: axes always labelled with units; no dual y-axes; no pie charts exce
 |---|---|
 | Video | 2–3 min, 1080p, clear audio, recorded against production |
 | README GIF | 90 s, silent, autoplay-friendly, shows load → diagnose → prescribe → swipe |
-| Repository | Public, `fortyguard` added as collaborator, README complete |
+| Repository | `Hackathon-FG` (hackathon@fortyguard.com) added as collaborator, README complete (public not required) |
 | `make demo` | Works on a clean clone with no API key |
 
 ---
@@ -3656,7 +3656,7 @@ Chart rules: axes always labelled with units; no dual y-axes; no pie charts exce
 
 ### Day 12 — Aug 29 · **Record and SUBMIT** ✅
 
-**Tasks.** Record the demo video against production. Final pass on the README. Run the §24.8 pre-submission checklist. Make the repository public. **Add `fortyguard` as a collaborator.** Submit: repository URL + live demo URL.
+**Tasks.** Record the demo video against production. Final pass on the README. Run the §24.8 pre-submission checklist. **Add `Hackathon-FG` (hackathon@fortyguard.com) as a collaborator** — the repository may remain private. Submit: repository URL + live demo URL.
 
 **Definition of done.** **Submitted a full day early.**
 
@@ -3697,7 +3697,7 @@ Priority order when time is lost, from first sacrificed to last defended:
 | | Verification **protocol emission** | The strategic idea, deterministic and cheap |
 | | Fixture mode + `make demo` | Judge reproducibility |
 | | Honesty Panel with real metrics | Credibility |
-| | Deployed live demo + public repo + `fortyguard` collaborator | **Submission requirements** |
+| | Deployed live demo + repo + `Hackathon-FG` (hackathon@fortyguard.com) collaborator + ≤500-word description | **Submission requirements** |
 | | README with GIF, architecture, validation, limitations; `DATA_LICENSES.md` | Graded whether or not stated |
 | **SHOULD HAVE (P1)** | Verification **execution** (re-measure + difference-in-differences) | High marginal value if Day 11 is calm |
 | | Impact & Equity screen | Strengthens the equity narrative |
@@ -3785,7 +3785,7 @@ Priority order when time is lost, from first sacrificed to last defended:
 |---|---|---|---|
 | Q-14 | **Is pre-hackathon code permitted?** | **NOT SPECIFIED** on the official website | Treat as not permitted. Pre-sprint work is limited to learning, throwaway scripts, design docs, and dataset downloads. First submission-repo commit dated Aug 18. |
 | Q-15 | **Exact submission cut-off time on Aug 30?** | **NOT SPECIFIED** — only the date and timezone (GST/UTC+4) | Submit Aug 29. |
-| Q-16 | Is a demo video or written writeup required in addition to the repo and live link? | **NOT SPECIFIED** — the FAQ names three items only (public repo, live demo link, `fortyguard` as collaborator) | Produce a video regardless — cheap insurance on the 10% Communication weight |
+| Q-16 | Is a demo video or written writeup required in addition to the repo and live link? | **ANSWERED 2026-08-18** — the official FAQ canvas names **four** items: live demo link, video (max 3 min), repo with `Hackathon-FG` (hackathon@fortyguard.com) as collaborator, and a **≤500-word description** (problem → who it's for → FortyGuard endpoints used → measured result) | All four are now in the §24.8 checklist |
 | Q-17 | Are tracks judged separately or in one global pool? | **NOT SPECIFIED** | Plan to win the global pool |
 | Q-18 | Are there named mentors or judges? | **NOT SPECIFIED** — the page lists Technical Support and a Community Slack, no names | Assume domain-expert judges from FortyGuard |
 | Q-19 | Sub-criteria within the four judging weights? | **NOT SPECIFIED** — only the four percentages are published | Optimize for the stated weights directly |
@@ -3838,7 +3838,7 @@ A feature is complete **only** when all five hold. Four out of five is incomplet
 | AC-16 | A rejected (422) request creates zero chargeable `fg_requests` rows | Automated test |
 | AC-17 | With FortyGuard mocked to 503, presets still load and the degraded banner appears | Automated E2E test |
 | AC-18 | With credits below the reserve, live analysis is refused and zero submissions occur | Automated test |
-| AC-19 | The public repository is live, README complete with GIF, `fortyguard` added as collaborator | Manual verification from a logged-out session |
+| AC-19 | The repository is live, README complete with GIF, `Hackathon-FG` (hackathon@fortyguard.com) added as collaborator | Manual verification from a logged-out session |
 | AC-20 | The live demo URL is public, HTTPS, and functional | Manual verification from an external network |
 | AC-21 | `docs/DATA_LICENSES.md` exists and lists every dataset, its licence, and the rendered attribution; OSM attribution visible on every map view and in the PDF | Manual review |
 | AC-22 | No prohibited causal phrasing appears in UI copy, the PDF, the README, or the demo narration | Lint check + manual review |
@@ -3918,8 +3918,8 @@ Final engineering checklist. Every box must be ticked before submission.
 - [ ] Fixture-mode local instance available as a live backup
 
 ## GitHub
-- [ ] Repository public
-- [ ] **`fortyguard` added as a collaborator** — verified
+- [ ] Repository reachable by judges (public, or private with the collaborator invite accepted)
+- [ ] **`Hackathon-FG` (hackathon@fortyguard.com) added as a collaborator** — verified
 - [ ] Description, topics, and license set
 - [ ] No large binaries; clone completes quickly
 - [ ] Committed fixtures under the 25 MB budget
@@ -3933,10 +3933,20 @@ Final engineering checklist. Every box must be ticked before submission.
 - [ ] `activity_id` recorded for every request and surfaced in provenance
 - [ ] Every documented contradiction resolved empirically or explicitly flagged
 
-## Submission
-- [ ] Public GitHub repository URL ready
-- [ ] Live demo URL ready
-- [ ] `fortyguard` collaborator confirmed
+## Submission — the official four items
+
+Per the hackathon FAQ canvas (see `docs/SLACK-OFFICIAL-FINDINGS-2026-08-18.md`),
+submission is **four** items, not three. The fourth was missing from this
+checklist until 2026-08-18.
+
+- [ ] **1. Live demo URL** — opens in incognito, no login or install, stays up through judging
+- [ ] **2. Video, max 3 minutes** — YouTube or Loom, unlisted is fine; must show the
+      project actually working, slides alone do not count
+- [ ] **3. Code repository** — GitHub or GitLab, with `Hackathon-FG`
+      (hackathon@fortyguard.com) added as collaborator. May stay private; the
+      collaborator invite is what grants judges access
+- [ ] **4. Description, ≤500 words** — problem → who it is for → which FortyGuard
+      endpoints/features were used → the measured result
 - [ ] Submitted **Aug 29** (a day before the deadline)
 - [ ] Submission confirmation retained
 
@@ -4014,7 +4024,7 @@ Concretely, the smallest version that can realistically compete for the top priz
 ## 36.4 The two non-negotiables
 
 1. **Scope freezes at the end of Day 10 (Aug 27).** No new features. Days 11–12 are deployment, hardening, documentation, and the demo.
-2. **Submit on Day 12 (Aug 29).** Repository public, `fortyguard` added as collaborator, live URL verified from a logged-out browser on an external network. Day 13 is buffer, not build time.
+2. **Submit on Day 12 (Aug 29).** Repository with `Hackathon-FG` (hackathon@fortyguard.com) as collaborator, live URL verified from a logged-out browser on an external network. Day 13 is buffer, not build time.
 
 Everything in this document is subordinate to those two rules. A frozen, deployed, documented, demoable MVP beats a more ambitious unfinished one on every single judging dimension.
 
