@@ -4,7 +4,8 @@ Working document. Tasks are ordered by dependency, so doing them top-to-bottom
 avoids writing anything twice. Each is sized to be finishable and verifiable on
 its own.
 
-**Last updated:** 2026-08-13 · **Target:** complete before 24 Aug · **Tests:** 506 passing
+**Last updated:** 2026-08-18 · **Target:** complete before 24 Aug · **Tests:** 559 collected,
+208 verified passing (full-suite run blocked — see N-1)
 
 > Commit SHAs changed when history was rewritten for the initial push; see
 > `git log` rather than quoting them here.
@@ -18,12 +19,16 @@ its own.
 | Frontend pages | ✅ 10 of 10 + drawer | — |
 | Backend persistence | ✅ complete | — |
 | Backend pipeline | ✅ all modules built | raster/census providers; training on real data |
-| Backend API surface | ✅ 18 routes wired | worker stages that call the pipeline |
-| Data | — | ⚠️ catalog (B-1) and fixtures (B-2) |
+| Backend API surface | ✅ 20 routes wired | worker stages that call the pipeline |
+| Local env | ✅ `.venv` + all deps install | — |
+| FortyGuard API | ✅ live, authenticated, parsed | — |
+| Data | ✅ fixtures (B-2) | ⚠️ catalog (B-1) still 1 of 4 rows |
 
-**Critical path to a working demo:** B-1 and B-2 are the only two items that
-cannot be resolved by writing code. Everything downstream of them is built and
-tested; they need published sources and an API key respectively.
+**Critical path to a working demo:** B-2 is resolved — 14 real Phoenix fixtures are
+committed, so the pipeline runs offline. B-1 remains: the catalog holds one row, so
+the optimizer can only ever recommend street trees. After B-1, the geo providers
+(Task 3) are the largest remaining code task, and model training (Task 4) depends
+on them.
 
 ---
 
@@ -47,12 +52,26 @@ Minimum viable set is four rows, one per category: `green` (street tree),
 `material` (cool roof or cool pavement), `shade` (shade structure), `water`
 (misting or irrigation).
 
-- [ ] Source and populate the catalog CSV
+- [~] Source and populate the catalog CSV — **1 of 4 rows done** (`street_tree_medium`,
+      fully sourced). Still missing one row each for `material`, `shade`, `water`;
+      candidates with sourced cost but unconfirmed effect size are parked in
+      `backend/data/CATALOG-RESEARCH.md`
 - [ ] `python -m scripts.load_catalog --dry-run` exits 0
 - [ ] `python -m scripts.load_catalog` loads it and readiness reports `ok`
 
-### B-2 · FortyGuard response fixtures
-`backend/data/fixtures/` is empty. `FIXTURE_MODE=true` is how the demo runs with zero
+### ✅ B-2 · FortyGuard response fixtures — RESOLVED 2026-08-18
+**14 real Phoenix responses captured and committed** (commit `a3c2871`): one `tcm`,
+one `time_of_measure`, one `persistence`, and eleven `exceedance` rungs — 14 MB,
+16,660 valued tiles, every file a recorded live response carrying its own
+`activity_id`. `FIXTURE_MODE=true` now runs the pipeline with zero credits, and
+`fixture_strict` no longer trips.
+
+Two API discrepancies were found and fixed while doing this (see N-2). Original
+note kept below for context.
+
+---
+
+`backend/data/fixtures/` was empty. `FIXTURE_MODE=true` is how the demo runs with zero
 credits (SRS P7) and how the tests avoid spending a budget — but a fixture is a
 **recorded** response, not a plausible one. Hand-writing a temperature field would
 launder invented measurements into the map, which is the same P1 violation as
@@ -65,9 +84,84 @@ Full contract in `backend/data/fixtures/README.md`.
 **Blocks:** the offline demo, and any integration test of the pipeline.
 **Needs first:** the `geo` module for tiling (Task 3).
 
-- [ ] `scripts/harvest_fixtures.py`
-- [ ] Capture Phoenix
-- [ ] Capture two more preset districts
+- [x] `scripts/harvest_fixtures.py`
+- [x] Capture Phoenix — 14/14 captured, exit 0
+- [ ] Capture two more preset districts (`lasvegas`, `tucson`) — 14 calls each
+
+---
+
+## 🆕 Found on 2026-08-18, during live-API bring-up
+
+These were not visible until the key arrived and the suite could actually run.
+
+### N-1 · Tests read the real `.env` — they can spend credits
+There is **no `conftest.py`**. `core/config.py:29` sets `env_file=".env"`, so a
+plain `pytest` run picks up the live key and whatever `FIXTURE_MODE` happens to be
+set. A full-suite run started with `FIXTURE_MODE=false` sat for 35 minutes with no
+output, almost certainly polling the live API, and had to be killed. That is a real
+credit-burn hazard, not a flake.
+
+**Fix:** add `backend/tests/conftest.py` that forces `FIXTURE_MODE=true` and blanks
+`FORTYGUARD_API_KEY` for the whole session, so no test can reach the network
+regardless of local `.env` state.
+
+- [ ] `tests/conftest.py` pinning fixture mode + empty key
+- [ ] Full 559-test suite completes and its pass/fail count is recorded here
+- [ ] CI runs it with no key present at all
+
+**Priority:** P0 — blocks trustworthy verification of everything else.
+**Effort:** ~30 min.
+
+### N-2 · Live API contradicts the documented response shape
+Fixed in `a3c2871`, recorded here because the docs still say otherwise:
+
+| Documented | Actually returned | Effect before fix |
+|---|---|---|
+| tile value under one of `value`/`temperature`/`tcm`/… | `average_temperature` | every tile parsed with `value=None` |
+| `stats_data.Temperature_stats.Mean` | `stats_data.temperature_stats.mean` | every statistic read as `None` |
+
+Both are now read under their observed names, still with no defaulting. Worth
+raising with the organisers, since the published docs are wrong.
+
+- [x] Parser reads the observed names
+- [ ] Report the discrepancy to FortyGuard (#help-technical or support@)
+
+### N-3 · `units` is absent from every live response — AC-02 cannot pass as written
+Confirmed across all 14 fixtures: `stats_data` carries **no** `units` field. The
+parser correctly returns `None` rather than assuming °C. AC-02 requires units "read
+from `stats_data.units`", which is currently unsatisfiable.
+
+Hardcoding "°C" would be exactly the fabrication P1 forbids, so this needs a product
+decision, not a code change:
+
+- [ ] Decide: render unitless, or label from `analytic_type` with the assumption
+      disclosed in the UI and the PDF the same way other assumptions are
+- [ ] Amend AC-02 to match whichever is chosen
+
+**Priority:** P1 — affects every number shown to a judge.
+
+### N-4 · Backend was not installable — fixed
+`pip install -e .` failed twice: `readme` pointed outside the package root, and the
+flat layout had no explicit package list. Both fixed in `a3c2871`. This also
+unblocks the production Dockerfile, which installs the same way.
+
+- [x] `pyproject.toml` installs cleanly into `backend/.venv`
+- [x] Full dependency stack builds on Python 3.14 (lightgbm, shap, rasterio,
+      geopandas, langgraph)
+
+### N-5 · Submission checklist is wrong in the SRS
+From the official hackathon canvases (see `docs/SLACK-OFFICIAL-FINDINGS-2026-08-18.md`):
+
+- The collaborator to add is **`Hackathon-FG` (hackathon@fortyguard.com)**. The SRS
+  says `fortyguard` in eight places — the wrong handle means judges cannot open the repo.
+- Submission is **four** items, not three. The missing one is a **≤500-word
+  description**: problem → who it's for → endpoints used → measured result.
+- The repo may stay **private**; the SRS's "make it public" step is stricter than required.
+
+- [ ] Correct the eight `fortyguard` references in `SRS-PRD.md`
+- [ ] Add the ≤500-word description to the submission checklist (§24.8)
+
+**Priority:** P0 before 30 Aug — cheap now, fatal on submission day.
 
 ---
 
@@ -211,7 +305,9 @@ Python 3.14 dependency risk already flagged.
 - [x] TreeSHAP per-tile attribution
 - [x] Out-of-support detection (reject rather than extrapolate)
 - [x] Counterfactual transforms per intervention category
-- [ ] Training on real data — needs B-2 fixtures
+- [ ] Training on real data — B-2 fixtures now exist; still blocked on the Task 3
+      providers, since a model trained on geometry-only features gives no useful
+      SHAP attribution (FR-011) and no honest metrics panel (FR-025)
 
 43 tests, including a real model trained on synthetic data with a known structure,
 so the tests assert it *recovered the relationship* rather than merely returned
