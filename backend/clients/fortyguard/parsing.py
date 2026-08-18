@@ -37,6 +37,11 @@ log = structlog.get_logger(__name__)
 #: once the live API shows which one it actually uses — do not add a fallback that
 #: computes or defaults a value.
 VALUE_KEYS: Final[tuple[str, ...]] = (
+    # Verified against a live /v1/heatmap tcm response (Phoenix, 2026-08-18):
+    # tiles carry `average_temperature` alongside `min_temperature`,
+    # `max_temperature` and `tile_id`. None of the previously guessed names
+    # appear, so every tile parsed with a null value until this was added.
+    "average_temperature",
     "value",
     "temperature",
     "tcm",
@@ -46,8 +51,10 @@ VALUE_KEYS: Final[tuple[str, ...]] = (
     "val",
 )
 
-#: Documented statistics block. Capitalised exactly as the API returns it — the
-#: earlier lowercase guess silently read nothing and produced a null district mean.
+#: Documented statistics block. The docs capitalise it; the live API returns it
+#: lower-cased, with lower-cased inner keys too. `read_stat` therefore tries the
+#: documented spelling first and the observed one second — reading one real
+#: figure under two spellings, never defaulting a value that is absent.
 TEMPERATURE_STATS_KEY: Final[str] = "Temperature_stats"
 
 STAT_NAMES: Final[dict[str, str]] = {
@@ -234,11 +241,16 @@ def read_stat(result: dict[str, Any], name: str) -> float | None:
 
     block = stats.get(TEMPERATURE_STATS_KEY)
     if not isinstance(block, dict):
-        # Tolerated fallback: some responses may flatten the block. Read only the
-        # documented capitalised key, never a lowercase guess.
+        # Observed on the live API: the block is lower-cased. Same measurement,
+        # different spelling — reading it is not a guess.
+        block = stats.get(TEMPERATURE_STATS_KEY.lower())
+    if not isinstance(block, dict):
+        # Tolerated fallback: some responses may flatten the block.
         block = stats
 
-    raw = block.get(STAT_NAMES.get(name, name))
-    if isinstance(raw, (int, float)) and not isinstance(raw, bool):
-        return float(raw)
+    documented = STAT_NAMES.get(name, name)
+    for candidate in (documented, documented.lower()):
+        raw = block.get(candidate)
+        if isinstance(raw, (int, float)) and not isinstance(raw, bool):
+            return float(raw)
     return None

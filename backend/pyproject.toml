@@ -2,7 +2,9 @@
 name = "coolrx-api"
 version = "1.0.0"
 description = "CoolRx — prescription-grade urban cooling intelligence (API)"
-readme = "../README.md"
+# No `readme` key: setuptools rejects a path outside the package root, which made
+# the backend uninstallable (`pip install -e .` failed the path assertion). The
+# README stays at the repository root; packaging metadata simply omits it.
 license = { text = "MIT" }
 
 # Originally pinned to 3.12 on the assumption that the whole geospatial and ML
@@ -70,6 +72,27 @@ dependencies = [
     # ── Observability ────────────────────────────────────────────────────────
     "structlog>=24.4",
     "sentry-sdk[fastapi]>=2.18",
+]
+
+[tool.setuptools]
+# Flat layout with several top-level packages, so discovery must be explicit —
+# automatic discovery refuses to guess and the build fails. `alembic` (migration
+# scripts) and `data` (CSV/fixtures) are deliberately absent: neither is an
+# importable package.
+packages = [
+    "agent",
+    "clients",
+    "controllers",
+    "core",
+    "geo",
+    "middleware",
+    "ml",
+    "optimizer",
+    "report",
+    "repositories",
+    "routes",
+    "schemas",
+    "workers",
 ]
 
 [project.optional-dependencies]
