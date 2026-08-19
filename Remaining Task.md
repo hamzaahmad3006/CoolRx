@@ -17,6 +17,7 @@ its own.
 | Layer | Done | Remaining |
 |---|---|---|
 | Frontend pages | ✅ 10 of 10 + drawer | — |
+| Deployment | ✅ Makefile · both Dockerfiles · CI | frontend service in compose |
 | Backend persistence | ✅ complete | — |
 | Backend pipeline | ✅ all modules built | raster/census providers; training on real data |
 | Backend API surface | ✅ 20 routes wired | worker stages that call the pipeline |
@@ -117,8 +118,11 @@ suite hangs rather than skipping. `docker compose -f infra/docker-compose.yml up
 makes them runnable; better, they should skip with a clear reason when the services
 are absent.
 
-- [ ] Mark the 35 service-dependent tests to skip cleanly when Postgres/Redis are down
-- [ ] Record their pass count once they can run
+- [x] Service-dependent tests now skip cleanly — `conftest.py` probes both ports
+      once per session (0.35 s socket timeout) and skips with a reason naming the
+      compose command to start them. **The full suite completes in one run again:
+      522 passed, 38 skipped, 0 failed.**
+- [ ] Record their pass count once Postgres/Redis are running (`make services`)
 
 ### 🟡 N-2 · Live API contradicts the documented response shape — parser fixed, report outstanding
 Fixed in `a3c2871`, recorded here because the docs still say otherwise:
@@ -173,6 +177,38 @@ From the official hackathon canvases (see `docs/SLACK-OFFICIAL-FINDINGS-2026-08-
 - [x] Relaxed "repository must be public" — private plus the collaborator invite
       is what the organisers actually require
 - [x] Q-16 closed: the FAQ canvas answers it
+
+---
+
+### ✅ N-6 · Demo harness, frontend container and CI — DONE 2026-08-18
+
+Three deployment gaps the audit found, all closed together.
+
+**`Makefile`** — AC-13 requires `git clone && make demo` to work with no API key.
+`make demo` refuses to start if no fixtures are committed, reports how many it
+found, and brings the stack up with `FIXTURE_MODE=true`. Also: `setup`, `services`,
+`migrate`, `api`, `worker`, `web`, `test`, `test-fast`, `lint`, `check`,
+`fixtures-plan`, `fixtures`, `train`.
+
+**`frontend/Dockerfile`** — the backend had one, the frontend did not, so the
+compose stack could not serve the UI and AC-20 had nothing to deploy. Three-stage
+build, non-root runtime, healthcheck. Required `output: "standalone"` in
+`next.config.ts`, which was also not set; type and lint errors now fail the
+production build instead of shipping.
+
+**`.github/workflows/ci.yml`** — three jobs. Backend runs the suite against real
+Postgres and Redis service containers **with no key present**, which is AC-13
+enforced rather than asserted. Frontend typechecks, builds, and greps the emitted
+bundle for credential-shaped strings (AC-15). A third job fails if a `.env` is ever
+tracked.
+
+- [x] `Makefile` with `demo` as the judge entry point
+- [x] `frontend/Dockerfile` + `output: "standalone"`
+- [x] CI with no key available to any job
+- [ ] **Not executed locally:** `make` is not installed on this machine, so the
+      recipes are syntax-reviewed but unrun. First CI run will exercise them.
+- [ ] Add the frontend service to `infra/docker-compose.yml` so `make demo` serves
+      the UI in the same stack rather than needing `make web` alongside
 
 ---
 
