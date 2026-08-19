@@ -110,7 +110,15 @@ class FixtureStore:
         if meta:
             payload.update(meta)
         with path.open("w", encoding="utf-8") as handle:
-            json.dump(payload, handle, indent=2, sort_keys=True, ensure_ascii=False)
+            # Compact, not pretty-printed. A heatmap response is thousands of
+            # tile polygons; indenting them cost ~18 MB across the set and pushed
+            # the committed fixtures past the 25 MB budget in SRS §12.4. These are
+            # read by machines, and `git diff` on a minified tile grid was never
+            # going to be reviewable either way.
+            json.dump(
+                payload, handle, separators=(",", ":"), sort_keys=True,
+                ensure_ascii=False,
+            )
         return path
 
     def total_bytes(self) -> int:

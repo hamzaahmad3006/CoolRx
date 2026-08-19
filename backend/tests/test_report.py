@@ -11,8 +11,8 @@ survive into it, rather than eyeballing layout.
 
 from __future__ import annotations
 
-import base64
 import re
+import base64
 import zlib
 from datetime import UTC, datetime
 
@@ -244,3 +244,45 @@ def test_the_equity_note_is_included_when_present() -> None:
         _data(equity_note="63% of the benefit reaches the most vulnerable deciles.")
     )
     assert "most vulnerable deciles" in _pdf_text(payload)
+
+
+def test_every_page_carries_the_required_attribution() -> None:
+    """ODbL obliges attribution wherever OSM-derived data appears, and SRS 12.2.1
+    names the PDF alongside the map views (AC-21).
+
+    Asserted against the rendered bytes rather than by reading the source, so
+    deleting the footer fails here rather than at submission. reportlab writes
+    page streams through ASCII85 *then* Flate; checking only the Flate layer
+    finds nothing and would pass a document with no attribution at all.
+    """
+    import base64
+    import zlib
+
+    pdf = build_report(_data())
+    assert pdf[:4] == b"%PDF"
+
+    needle = b"OpenStreetMap contributors"
+
+    def _plain(raw: bytes) -> bytes:
+        for decode in (
+            # reportlab emits ASCII85 with a trailing "~>" but no leading "<~",
+            # so adobe=True alone rejects it.
+            lambda b: zlib.decompress(base64.a85decode(b.rstrip(b"~>"))),
+            lambda b: zlib.decompress(base64.a85decode(b, adobe=True)),
+            zlib.decompress,
+            lambda b: b,
+        ):
+            try:
+                return decode(raw)
+            except Exception:  # noqa: BLE001 - try the next encoding
+                continue
+        return b""
+
+    # Regex rather than split: splitting on b"stream" also matches inside
+    # b"endstream", leaving a trailing "end" that corrupts the ASCII85 payload.
+    streams = [m.strip() for m in re.findall(b"stream(.*?)endstream", pdf, re.S)]
+    assert streams, "the PDF carried no content stream"
+
+    assert any(needle in _plain(chunk) for chunk in streams), (
+        "the OpenStreetMap attribution is missing from the rendered PDF"
+    )

@@ -39,6 +39,17 @@ BODY_SIZE: Final[float] = 9.5
 SMALL_SIZE: Final[float] = 8.0
 LEADING: Final[float] = 13.0
 
+#: Required attribution, rendered on every page.
+#:
+#: ODbL obliges attribution wherever OSM-derived data appears, and SRS §12.2.1
+#: names the PDF explicitly alongside the map views. The frontend already carries
+#: the same string via BRAND.attribution; this is the other half of AC-21. It sits
+#: in the footer rather than a credits page so it cannot be lost by printing or
+#: sharing a single sheet.
+ATTRIBUTION: Final[str] = (
+    "© OpenStreetMap contributors · Temperature data © FortyGuard"
+)
+
 INK = (0.09, 0.09, 0.10)
 MUTED = (0.42, 0.43, 0.45)
 RULE = (0.85, 0.85, 0.83)
@@ -218,6 +229,13 @@ class _Cursor:
             MARGIN - 16,
             "CoolRx · planning-grade estimates, not measurements",
         )
+        # Centred so it survives on a page whose left note is long, and drawn on
+        # every page for the same reason the frontend draws it on every view.
+        pdf.setFont("Helvetica", 6.5)  # type: ignore[attr-defined]
+        pdf.drawCentredString(  # type: ignore[attr-defined]
+            PAGE_WIDTH / 2, MARGIN - 26, ATTRIBUTION
+        )
+        pdf.setFont("Helvetica", 7.5)  # type: ignore[attr-defined]
         pdf.drawRightString(  # type: ignore[attr-defined]
             PAGE_WIDTH - MARGIN, MARGIN - 16, str(self.page)
         )
