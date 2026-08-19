@@ -23,7 +23,7 @@ its own.
 | Backend API surface | ✅ 20 routes wired | worker stages that call the pipeline |
 | Local env | ✅ `.venv` + all deps install | — |
 | FortyGuard API | ✅ live, authenticated, parsed | — |
-| Data | ✅ fixtures, 2 districts, provenance | ⚠️ catalog 1 of 4 · Tucson not captured |
+| Data | ✅ fixtures, 3 districts, provenance, 15.4 MB | ⚠️ catalog 1 of 4 rows |
 
 **Critical path to a working demo:** B-2 is resolved — 14 real Phoenix fixtures are
 committed, so the pipeline runs offline. B-1 remains: the catalog holds one row, so
@@ -322,6 +322,42 @@ from <https://api.census.gov/data/key_signup.html>.
 prerequisites recorded.
 
 - [x] README status corrected
+
+---
+
+### ✅ N-9 · Tucson captured · attribution rendered — DONE 2026-08-19
+
+**Third district harvested.** 42 recorded responses now committed across
+phoenix, lasvegas and tucson. `train_model --check` reads **3 districts** and
+**3,543 labelled tiles**.
+
+- [x] Capture Tucson
+
+**Fixture writer was still pretty-printing.** The new provenance envelope went
+through `FixtureStore.save`, which used `indent=2`, so the Tucson batch landed
+verbose and the set hit 24.7 MB — one rounding error from the 25 MB ceiling in
+SRS §12.4. The writer now emits compact JSON and the whole set was re-serialised:
+**15.4 MB**.
+
+- [x] `FixtureStore.save` writes compact JSON
+- [x] Set re-serialised, back inside budget
+
+**AC-21 attribution — the half that was missing.** The frontend already carried
+`BRAND.attribution` into all three map components. The PDF carried nothing, and
+SRS §12.2.1 names the PDF explicitly. `report/pdf.py` now stamps
+"© OpenStreetMap contributors · Temperature data © FortyGuard" on every page
+footer, so it survives someone printing or sharing a single sheet.
+
+Verified against rendered bytes, not by reading the source: reportlab writes page
+streams through ASCII85 *then* Flate, and splitting on `b"stream"` also matches
+inside `b"endstream"` — both traps silently pass a document with no attribution.
+The test undoes both layers properly.
+
+- [x] Attribution on every PDF page
+- [x] `test_every_page_carries_the_required_attribution` asserts it in the output
+- [x] Frontend attribution confirmed already present (all three map components)
+- [ ] Tick the compliance checklist in `docs/DATA_LICENSES.md` once a reviewer
+      has seen both surfaces
 
 ---
 
