@@ -86,6 +86,7 @@ class FixtureStore:
         endpoint: str,
         request_body: dict[str, Any],
         response: dict[str, Any],
+        meta: dict[str, Any] | None = None,
     ) -> Path:
         """Record a live response as a fixture.
 
@@ -101,6 +102,13 @@ class FixtureStore:
             "request_body": request_body,
             "response": response,
         }
+        # Provenance: which district and which live task produced this recording.
+        # Without it a fixture-backed run has no activity_id to resolve against
+        # fg_requests (FR-019), and a grouped holdout cannot tell two districts
+        # apart. Merged rather than nested so existing readers of the envelope
+        # keep working.
+        if meta:
+            payload.update(meta)
         with path.open("w", encoding="utf-8") as handle:
             json.dump(payload, handle, indent=2, sort_keys=True, ensure_ascii=False)
         return path

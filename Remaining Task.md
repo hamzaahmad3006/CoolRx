@@ -23,7 +23,7 @@ its own.
 | Backend API surface | ✅ 20 routes wired | worker stages that call the pipeline |
 | Local env | ✅ `.venv` + all deps install | — |
 | FortyGuard API | ✅ live, authenticated, parsed | — |
-| Data | ✅ fixtures, 2 districts | ⚠️ catalog 1 of 4 · fixtures lack provenance (N-8) |
+| Data | ✅ fixtures, 2 districts, provenance | ⚠️ catalog 1 of 4 · Tucson not captured |
 
 **Critical path to a working demo:** B-2 is resolved — 14 real Phoenix fixtures are
 committed, so the pipeline runs offline. B-1 remains: the catalog holds one row, so
@@ -256,7 +256,7 @@ says what would change that.
 
 ---
 
-### 🟡 N-8 · Second district harvested · Census needs a key · fixtures lack provenance
+### ✅ N-8 · Fixture provenance — FIXED 2026-08-19 · Census still needs a key
 
 **Las Vegas captured.** 28 recorded responses now committed, 14 per district.
 `train_model --check` reads **2,353 labelled tiles** across both, up from 1,190.
@@ -284,8 +284,28 @@ than training:
 captured_at}` and have `load` keep tolerating the bare-result shape so the 28
 already captured stay readable. Then re-harvest, or backfill the metadata.
 
-- [ ] Extend the fixture envelope with request/district/activity_id provenance
-- [ ] `train_model --check` reports 2+ districts once it can see them
+- [x] **Root cause was narrower than described.** `FixtureStore.save` already wrote
+      a rich envelope; `harvest_fixtures.py` never called it, writing `result.result`
+      straight to disk instead. Fixed at the write path rather than the format.
+- [x] `FixtureStore.save` takes optional `meta`; harvest now records district,
+      district_name, analytic_type, threshold_c, activity_id and captured_at
+- [x] **All 28 existing fixtures backfilled without spending a credit.** The
+      filename *is* `compute_request_hash(endpoint, payload)`, so replaying each
+      district's plan reconstructs the hash → district mapping exactly.
+      `scripts/backfill_fixture_provenance.py`, 28 upgraded, **0 unmatched**.
+      `activity_id` is set null, not invented — it was never recorded — and the
+      recordings are stamped `provenance_backfilled: true` so a reviewer can tell
+      which have a real task id behind them.
+- [x] `train_model --check` now reports **2 districts** (phoenix, lasvegas),
+      2,353 labelled tiles, **`grouped_holdout_possible: true`**
+- [x] Two regressions from this change caught and fixed: the trainer stopped
+      reading the new envelope shape, and re-serialising with indent pushed the
+      fixture set to 28.6 MB, over the 25 MB budget in SRS §12.4. Now compact:
+      **10.2 MB**
+- [x] All 28 fixtures still parse; suite still 522 passed / 38 skipped / 0 failed
+
+**Training precondition 1 is now satisfied.** The trainer blocks on one thing only:
+10 of 13 features need the NLCD, terrain and census providers.
 
 **The US Census API now requires a key.** SRS §12.2 lists ACS as open. As of
 2026-08-18 an unauthenticated request returns a "Missing Key" HTML page, so
