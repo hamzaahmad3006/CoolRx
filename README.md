@@ -31,7 +31,7 @@ Measure → Diagnose → Understand → Prioritize → Prescribe → Optimize �
 
 ## Quick start
 
-Everything runs offline against committed fixtures. No API key needed to look around.
+Everything runs offline against committed fixtures — `make demo` needs no API key.
 
 ```bash
 docker compose -f infra/docker-compose.yml --profile api up -d
@@ -178,10 +178,12 @@ All ten SRS screens are built. Every backend pipeline module exists and is teste
 | Area | State |
 |---|---|
 | Frontend | ✅ 10/10 screens + attribution drawer |
-| API | ✅ 18 endpoints, one error envelope, OpenAPI at `/api/docs` |
+| API | ✅ 20 endpoints, one error envelope, OpenAPI at `/api/docs` |
 | Persistence | ✅ 13 tables, PostGIS, Alembic baseline |
 | Pipeline | ✅ geo, ml, optimizer, agent, report — all wired into the workers |
-| Tests | ✅ 530 backend, `tsc` clean |
+| FortyGuard | ✅ live API verified end to end; 14 recorded Phoenix responses committed |
+| Deployment | ✅ Makefile, both Dockerfiles, compose, CI |
+| Tests | ✅ 559 backend — 522 pass, 38 skip without Postgres/Redis, 0 fail; `tsc` clean |
 
 ### What needs data, not code
 
@@ -202,16 +204,29 @@ trade-off worth reading before it is included at all.
 cd backend && python -m scripts.load_catalog
 ```
 
-**FortyGuard fixtures.** `backend/data/fixtures/` is empty. A fixture is a *recorded*
+**FortyGuard fixtures — captured.** `backend/data/fixtures/` holds **14 recorded
+Phoenix responses** (one `tcm`, one `time_of_measure`, one `persistence`, eleven
+`exceedance` rungs), carrying 16,660 valued tiles. A fixture is a *recorded*
 response, never a hand-written one — a fabricated temperature field would launder
-invented measurements into every figure downstream. Capturing costs 14 calls per
-district, once:
+invented measurements into every figure downstream. Because these are committed,
+`make demo` runs the whole pipeline with no API key at all.
+
+Capturing another district costs 14 calls, once:
 
 ```bash
-cd backend && python -m scripts.harvest_fixtures --district phoenix --dry-run
+make fixtures-plan DISTRICT=lasvegas   # free — prints the plan
+make fixtures DISTRICT=lasvegas        # spends 14 credits
 ```
 
-Drop `--dry-run` with `FORTYGUARD_API_KEY` set and `FIXTURE_MODE=false` to capture.
+**Model training is still blocked, deliberately.** `python -m scripts.train_model
+--check` reports why: a grouped holdout needs two or more districts, and 10 of the
+13 features need the NLCD, terrain and census providers that are not written yet.
+The script refuses rather than producing a model whose metrics overstate it.
+
+**The US Census API now requires a key.** SRS §12.2 assumed it was open; as of
+2026-08-18 an unauthenticated ACS request returns a "Missing Key" page. A free key
+from <https://api.census.gov/data/key_signup.html> is needed before the population
+and vulnerability features can be built.
 
 ---
 

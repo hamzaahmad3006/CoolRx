@@ -147,6 +147,12 @@ class Settings(BaseSettings):
 
     # ── Auth / limits ────────────────────────────────────────────────────────
     #: Gate for credit-spending endpoints. Public reads need none (SRS ADR-008).
+    #: US Census ACS. Optional: absent, the census provider reports itself
+    #: unavailable and population/vulnerability features stay null. It is not
+    #: required at import time because the pipeline is designed to degrade on a
+    #: missing provider rather than refuse to start.
+    census_api_key: str | None = None
+
     demo_key: str | None = None
     rate_limit_write_per_hour: int = 5
     rate_limit_read_per_minute: int = 300
