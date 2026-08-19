@@ -23,7 +23,7 @@ its own.
 | Backend API surface | ✅ 20 routes wired | worker stages that call the pipeline |
 | Local env | ✅ `.venv` + all deps install | — |
 | FortyGuard API | ✅ live, authenticated, parsed | — |
-| Data | ✅ fixtures (B-2) | ⚠️ catalog (B-1) still 1 of 4 rows |
+| Data | ✅ fixtures, 2 districts | ⚠️ catalog 1 of 4 · fixtures lack provenance (N-8) |
 
 **Critical path to a working demo:** B-2 is resolved — 14 real Phoenix fixtures are
 committed, so the pipeline runs offline. B-1 remains: the catalog holds one row, so
@@ -253,6 +253,55 @@ says what would change that.
 - [ ] Attribution actually rendered on map views and in the PDF (compliance
       checklist inside the file is unticked — it documents the obligation, it does
       not satisfy it)
+
+---
+
+### 🟡 N-8 · Second district harvested · Census needs a key · fixtures lack provenance
+
+**Las Vegas captured.** 28 recorded responses now committed, 14 per district.
+`train_model --check` reads **2,353 labelled tiles** across both, up from 1,190.
+
+- [x] Capture Phoenix
+- [x] Capture Las Vegas
+- [ ] Capture Tucson — the third preset, 14 more calls
+
+**But the holdout gate still cannot pass, for a reason I got wrong.** The trainer
+blocks on "only one district", and that is not what is happening. The fixture
+envelope stores only `{map_data, stats_data}` — **no request body, no district, no
+activity_id**. So both districts read back as `"unknown"` and `district_count` is 1
+no matter how many are harvested.
+
+This is a defect in the fixture *format*, not the harvest, and it reaches further
+than training:
+
+  * `train_model` can never satisfy its own grouped-holdout precondition
+  * FR-019 promises every FortyGuard-derived figure resolves to an `activity_id`
+    in `fg_requests`; a fixture-backed run has no activity_id to resolve to
+  * a reviewer cannot tell what request produced a given recording, which is the
+    thing `data/fixtures/README.md` says the envelope is for
+
+**Fix:** have `FixtureStore.save` write `{request, response, district, activity_id,
+captured_at}` and have `load` keep tolerating the bare-result shape so the 28
+already captured stay readable. Then re-harvest, or backfill the metadata.
+
+- [ ] Extend the fixture envelope with request/district/activity_id provenance
+- [ ] `train_model --check` reports 2+ districts once it can see them
+
+**The US Census API now requires a key.** SRS §12.2 lists ACS as open. As of
+2026-08-18 an unauthenticated request returns a "Missing Key" HTML page, so
+population, age and poverty features cannot be built without one. Free and instant
+from <https://api.census.gov/data/key_signup.html>.
+
+- [x] `CENSUS_API_KEY` added to `.env.example` and `core/config.py`, optional so a
+      missing key leaves those features null rather than refusing to start
+- [ ] **Needs you:** register for a key
+- [ ] Then write the census provider
+
+**README** brought back in line with reality: 20 endpoints not 18, 559 tests not
+530, fixtures present rather than "empty", `make demo` documented, and the two new
+prerequisites recorded.
+
+- [x] README status corrected
 
 ---
 
