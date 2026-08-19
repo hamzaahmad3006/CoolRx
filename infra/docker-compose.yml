@@ -97,6 +97,30 @@ services:
     command:
       ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
+  web:
+    profiles: ["api"]
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args:
+        # Build-time only, and public by definition: NEXT_PUBLIC_* values are
+        # inlined into the client bundle. Nothing secret may appear here — the
+        # FortyGuard key lives in the api service and never crosses to the browser.
+        NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+        NEXT_PUBLIC_USE_FIXTURES: "false"
+    container_name: coolrx-web
+    depends_on:
+      api:
+        condition: service_started
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
   worker:
     profiles: ["api"]
     build:

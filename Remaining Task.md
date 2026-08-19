@@ -17,7 +17,7 @@ its own.
 | Layer | Done | Remaining |
 |---|---|---|
 | Frontend pages | ✅ 10 of 10 + drawer | — |
-| Deployment | ✅ Makefile · both Dockerfiles · CI | frontend service in compose |
+| Deployment | ✅ Makefile · both Dockerfiles · CI · compose web | Docker run unverified |
 | Backend persistence | ✅ complete | — |
 | Backend pipeline | ✅ all modules built | raster/census providers; training on real data |
 | Backend API surface | ✅ 20 routes wired | worker stages that call the pipeline |
@@ -209,6 +209,50 @@ tracked.
       recipes are syntax-reviewed but unrun. First CI run will exercise them.
 - [ ] Add the frontend service to `infra/docker-compose.yml` so `make demo` serves
       the UI in the same stack rather than needing `make web` alongside
+
+---
+
+### ✅ N-7 · Trainer entry point, frontend in compose, data licences — DONE 2026-08-18
+
+**`backend/scripts/train_model.py`** — the `make train` target referenced a script
+that did not exist. It does now, and it refuses to train when training would be
+dishonest. Two preconditions, checked before any booster is fit:
+
+  1. *Grouped holdout needs 2+ districts.* `TrainingReport` splits by district
+     because tiles within one are spatially autocorrelated; a random split leaks
+     neighbours and reports accuracy the model does not have. Only Phoenix is
+     harvested.
+  2. *The feature vector needs the raster/census providers.* `FEATURE_ORDER` is 13
+     features; 3 resolve today (`hour_utc`, `doy`, `latitude`). A model fit on
+     those still yields TreeSHAP attributions — attributing urban heat to latitude
+     and time of day, which is not what FR-011 promises a planner.
+
+`--check` reports readiness as JSON. Verified against the committed fixtures: it
+finds **1,190 labelled tiles**, correctly ignores the exceedance/persistence
+recordings (hour counts, not temperatures), and blocks with both reasons named.
+`--allow-thin-features` exists for experimentation and marks output `honest: false`.
+
+- [x] `scripts/train_model.py` with readiness gating
+- [x] `--check` verified against real fixtures
+- [ ] Feature-row assembly past the gate — deliberately unwritten until the
+      providers exist; fabricating rows is the violation the script prevents
+
+**Frontend in `infra/docker-compose.yml`** — a `web` service was missing, so
+`make demo` could bring up the API but not the UI.
+
+- [x] `web` service, `api` profile, healthcheck, public-only build args
+- [ ] Verify `docker compose --profile api up` end to end (Docker not run here)
+
+**`docs/DATA_LICENSES.md`** — required for submission by SRS §12.2.1 (AC-21).
+Every dataset with licence and rendered attribution. States CoolRx's ODbL
+share-alike position explicitly: results and a fixed fixture sample are
+distributed, not an OSM-derived database, so share-alike is not triggered — and
+says what would change that.
+
+- [x] `docs/DATA_LICENSES.md` written
+- [ ] Attribution actually rendered on map views and in the PDF (compliance
+      checklist inside the file is unticked — it documents the obligation, it does
+      not satisfy it)
 
 ---
 
