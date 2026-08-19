@@ -20,6 +20,7 @@ exact cost without spending anything.
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
 import json
 import sys
 from dataclasses import dataclass
@@ -27,7 +28,7 @@ from pathlib import Path
 
 import structlog
 
-from clients.fortyguard.cache import compute_request_hash
+from clients.fortyguard.cache import FixtureStore, compute_request_hash
 from clients.fortyguard.client import FortyGuardClient
 from clients.fortyguard.errors import FortyGuardError
 from core.config import get_settings
@@ -218,8 +219,19 @@ def harvest(district: District, *, dry_run: bool) -> int:
             # Named by request hash so a fixture lookup and a cache lookup resolve
             # identically — fixture mode then exercises the real code path rather
             # than a parallel one.
-            target.write_text(
-                json.dumps(result.result, indent=2, sort_keys=True), encoding="utf-8"
+            FixtureStore(str(fixture_dir), strict=False).save(
+                digest,
+                "heatmap",
+                payload,
+                result.result,
+                meta={
+                    "district": district.key,
+                    "district_name": district.name,
+                    "analytic_type": analytic,
+                    "threshold_c": threshold,
+                    "activity_id": result.activity_id,
+                    "captured_at": datetime.now(timezone.utc).isoformat(),
+                },
             )
             captured += 1
             print(f"    [   captured] {analytic}{suffix}  {target.name}")

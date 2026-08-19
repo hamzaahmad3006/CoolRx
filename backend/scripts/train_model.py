@@ -83,17 +83,21 @@ def _load_tcm_fixtures(fixture_dir: Path) -> dict[str, list[Any]]:
             log.warning("train.fixture_unreadable", path=str(path), error=str(exc))
             continue
 
+        # Envelope shapes seen in the wild, in order of preference:
+        #   {request_hash, ..., response: {map_data, stats_data}}   current
+        #   {response: {data: {result: {...}}}}                     full API echo
+        #   {map_data, stats_data}                                  pre-provenance
         result = payload
-        if isinstance(payload.get("response"), dict):
-            data = payload["response"].get("data")
-            result = data.get("result", {}) if isinstance(data, dict) else {}
+        response = payload.get("response")
+        if isinstance(response, dict):
+            data = response.get("data")
+            if isinstance(data, dict) and isinstance(data.get("result"), dict):
+                result = data["result"]
+            else:
+                result = response
 
-        request = payload.get("request") if isinstance(payload, dict) else None
-        analytic = None
-        district = "unknown"
-        if isinstance(request, dict):
-            analytic = request.get("analytic_type")
-            district = str(request.get("_district") or district)
+        analytic = payload.get("analytic_type")
+        district = str(payload.get("district") or "unknown")
 
         parsed = parse_heatmap(result)
         values = [t for t in parsed.tiles if t.value is not None]
