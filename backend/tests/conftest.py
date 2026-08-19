@@ -63,3 +63,70 @@ def _assert_offline() -> None:
         "A FortyGuard API key is visible to the test session. Tests must not be "
         "able to authenticate against the live API."
     )
+
+# ── Service-dependent tests ──────────────────────────────────────────────────
+# `test_health`, `test_job_progress` and `test_aoi_routes` open real connections
+# to Postgres and Redis. With neither running they do not fail — they block on
+# the connect timeout, which is how a full-suite run came to sit for 35 minutes
+# producing nothing. A hang is worse than a failure: it tells you nothing and it
+# stops everything behind it.
+#
+# So availability is probed once, cheaply, with a short socket timeout, and the
+# affected modules are skipped with a reason that says exactly what to start.
+# Nothing is mocked: when the services are up the tests run for real.
+
+_SERVICE_MODULES = ("test_health", "test_job_progress", "test_aoi_routes")
+
+
+def _port_open(host: str, port: int, timeout: float = 0.35) -> bool:
+    import socket
+
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
+def _services_up() -> tuple[bool, str]:
+    """(all_up, human reason). Probed once per session, not per test."""
+    from urllib.parse import urlparse
+
+    from core.config import get_settings
+
+    settings = get_settings()
+    down: list[str] = []
+
+    db = urlparse(settings.database_url.replace("postgresql+psycopg", "postgresql"))
+    if not _port_open(db.hostname or "localhost", db.port or 5432):
+        down.append(f"Postgres ({db.hostname or 'localhost'}:{db.port or 5432})")
+
+    rd = urlparse(settings.redis_url)
+    if not _port_open(rd.hostname or "localhost", rd.port or 6379):
+        down.append(f"Redis ({rd.hostname or 'localhost'}:{rd.port or 6379})")
+
+    if down:
+        return False, " and ".join(down) + " not reachable"
+    return True, ""
+
+
+def pytest_collection_modifyitems(config, items) -> None:  # noqa: ANN001
+    del config
+    if not any(
+        any(m in item.nodeid for m in _SERVICE_MODULES) for item in items
+    ):
+        return
+
+    up, reason = _services_up()
+    if up:
+        return
+
+    skip = pytest.mark.skip(
+        reason=(
+            f"{reason}. Start them with: "
+            "docker compose -f infra/docker-compose.yml up -d db redis"
+        )
+    )
+    for item in items:
+        if any(m in item.nodeid for m in _SERVICE_MODULES):
+            item.add_marker(skip)

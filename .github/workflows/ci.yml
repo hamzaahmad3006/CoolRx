@@ -1,0 +1,135 @@
+name: CI
+
+# Two things this must prove, beyond "the tests pass":
+#
+#   AC-13 — the suite runs on a machine that has never seen a FortyGuard key.
+#           No secret is provided to any job below, deliberately. If a test ever
+#           needs one to pass, that is the bug.
+#   AC-15 — no key reaches the built frontend bundle.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Belt and braces alongside tests/conftest.py, so a CI run cannot spend credits
+  # even if that file is edited.
+  FIXTURE_MODE: "true"
+  FIXTURE_STRICT: "true"
+  FORTYGUARD_API_KEY: ""
+
+jobs:
+  backend:
+    name: Backend · tests and types
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: coolrx
+          POSTGRES_PASSWORD: coolrx
+          POSTGRES_DB: coolrx
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U coolrx -d coolrx"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Fixtures are committed
+        # AC-13 depends on these being in the repository, not on a local harvest.
+        run: |
+          count=$(ls data/fixtures/*.json 2>/dev/null | wc -l)
+          echo "recorded fixtures: $count"
+          test "$count" -gt 0 || { echo "::error::no fixtures committed"; exit 1; }
+
+      - name: Tests
+        env:
+          DATABASE_URL: postgresql+psycopg://coolrx:coolrx@localhost:5432/coolrx
+          REDIS_URL: redis://localhost:6379/0
+        run: pytest -q
+
+      - name: Ruff
+        run: ruff check .
+
+      - name: Mypy
+        run: mypy .
+        continue-on-error: true
+
+  frontend:
+    name: Frontend · types and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
+
+      - name: No secret reached the bundle
+        # AC-15. A 32-hex FortyGuard key or an Anthropic/Groq key appearing in
+        # client output means it was inlined at build time and is public.
+        run: |
+          if grep -rIEq '\b[0-9a-f]{32}\b|sk-ant-[A-Za-z0-9_-]+|gsk_[A-Za-z0-9]+' .next/static 2>/dev/null; then
+            echo "::error::a credential-shaped string is present in the client bundle"
+            exit 1
+          fi
+          echo "clean"
+
+  secrets:
+    name: Repository · no committed secrets
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: No .env committed
+        run: |
+          if git ls-files | grep -E '(^|/)\.env$'; then
+            echo "::error::a .env file is tracked"
+            exit 1
+          fi
+          echo "clean"
