@@ -536,6 +536,46 @@ returning 504s would put it in the demo path untested.
 
 ---
 
+### 🟡 N-14 · Land-cover classes solved — water + grass/shrub LIVE
+
+**The WMS palette-index problem is resolved.** `geo/landcover.py` reads true NLCD
+class codes over **WCS**. Two details, both found the hard way:
+
+1. The coverage is published in **EPSG:3857**, not Albers 5070 — subsetting with
+   Albers coordinates returns *"Empty intersection after subsetting"*, which is what
+   made this look unreachable earlier.
+2. GeoServer cannot write GeoTIFF in 3857 — *"Unable to map projection Popular
+   Visualisation Pseudo Mercator"*. `outputCrs=EPSG:4326` reprojects and succeeds.
+
+Subset in Web Mercator, request WGS84 out. The Phoenix box then returns
+`{22: 4, 23: 181, 24: 595}` — Developed Low/Medium/High Intensity, real class codes.
+
+**Discriminating check, live:** downtown Phoenix reads **0% grass/shrub** across four
+tiles, a Papago Park tile reads **87.37%**. That contrast is the proof the class layer
+is being read rather than render indices.
+
+- [x] `water_pct` — class 11 only; 12 (perennial ice) excluded, it is not water that
+      cools a street
+- [x] `grass_shrub_pct` — classes 52 and 71; 81 pasture and 82 crops excluded, they
+      are agricultural cover and the feature names grass and shrub
+- [x] Fill values leave the **denominator** — counting them as "not water" would
+      deflate every fraction
+- [x] 13 tests, all offline
+
+**`albedo_proxy` still null, deliberately.** The class layer could supply it, but it
+needs a per-class reflectance table, and albedo feeds a predicted temperature
+reduction a city would spend money on. An uncited constant there is the same P1
+violation as an invented catalog cost.
+
+- [ ] `albedo_proxy` — needs a citable per-class albedo table
+
+**Model features: 7 of 13 resolve** — `hour_utc`, `doy`, `latitude`,
+`impervious_pct`, `canopy_pct`, `water_pct`, `grass_shrub_pct`.
+Remaining 6: `albedo_proxy`, `openness_proxy`, `building_pct`, `elevation_m`,
+`local_relief_m`, `dist_to_water_m`.
+
+---
+
 ## Phase A — API contract and wiring
 
 ### ✅ Task 1 · Pydantic request/response schemas · `backend/schemas/` — DONE
