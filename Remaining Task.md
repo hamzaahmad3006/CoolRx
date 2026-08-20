@@ -466,8 +466,30 @@ Serving a tract figure from a provider that declares block-group resolution woul
 overstate its precision, the same way the SRS insists SVI be labelled at its true tract
 resolution. It needs its own provider with its own declared resolution.
 
-- [ ] `pct_poverty` — tract-level provider, resolution declared honestly
-- [ ] SVI — CDC/ATSDR file download, no key, also tract-level
+- [x] **`pct_poverty` — DONE 2026-08-20**, `geo/poverty.py`. Live on the Phoenix AOI:
+      18.4% – 37.6% across four tiles, and tract 1131's own figure (1,885 of 5,011 =
+      37.6%) lands exactly on the tile sitting wholly inside it.
+- [x] Separate provider precisely so the resolution can be declared honestly — ACS
+      publishes B17001 at **tract** level only, verified: the block-group query
+      returns `null` for every row.
+- [x] **A rate is assigned, not apportioned.** 37.6% over a tract does not become
+      11% because a tile covers 30% of it. Straddling tiles get an area-weighted
+      *mix* of the two rates, never a dilution of either. This is the bug that would
+      have quietly deflated every equity figure.
+- [x] Boundaries reuse the census TIGERweb query — a tract GEOID is a block-group
+      GEOID's first 11 characters, so no extra endpoint to depend on
+- [x] Universe of zero yields no rate, not 0% — nobody there had poverty status
+      determined
+- [x] 11 tests, all offline
+- [ ] **SVI — still unsourced.** CDC/ATSDR publishes it at tract level, which would
+      fit this provider exactly, but the data.cdc.gov dataset (`ypqf-r5qs`) is
+      registered as a **map asset with zero queryable columns** — the Socrata row
+      endpoint returns `[{}]` — and the other catalogue ids 404. Guessing a download
+      URL risks loading the wrong vintage or geography under an equity weighting a
+      city would act on, so `svi_score` stays null until the source is confirmed.
+
+**Exposure: 3 of 4 fields now resolve** (`population`, `pct_over65`, `pct_poverty`).
+The equity λ dial still multiplies against a null SVI and so does nothing yet.
 
 **The apportionment assumption, stated plainly:** people are spread evenly within a
 block group. They are not. A true dasymetric method weights by where buildings are, and
