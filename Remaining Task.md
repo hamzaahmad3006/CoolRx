@@ -397,6 +397,53 @@ alone do not count.
 
 ---
 
+### 🟡 N-11 · NLCD providers — impervious + canopy LIVE, class layer deferred
+
+**Two of the ten missing features now resolve from real data.** `geo/mrlc.py`, verified
+live against the Phoenix AOI on 2026-08-19:
+
+| Tile | impervious_pct | canopy_pct |
+|---|---|---|
+| a | 82.52 | 0.62 |
+| b | 91.25 | 0.00 |
+| c | 87.62 | 0.06 |
+| d | 78.54 | 0.38 |
+
+100% coverage, no API key, MRLC WMS. Dense pavement and almost no canopy — which is
+what downtown Phoenix is.
+
+**Design: one raster per AOI, not one query per tile.** The obvious approach is a
+`GetFeatureInfo` per tile, but a district is ~1,200 tiles × 2 layers ≈ 2,400 requests
+against a free public service *per diagnosis*. Instead each layer is fetched once as a
+GeoTIFF sized to NLCD's native 30 m grid and sampled locally. Two requests per district;
+the Phoenix raster is ~2.5 KB. Tiles take the **mean** of the cells they cover, not the
+centroid value — a 60–100 m tile spans several 30 m cells.
+
+- [x] `ImperviousProvider` → `impervious_pct`
+- [x] `TreeCanopyProvider` → `canopy_pct`
+- [x] 9 tests, all offline (stubbed transport; the suite must never call mrlc.gov)
+- [x] No-data (250–255) dropped before averaging, never clamped into a percentage
+- [x] Transport failure yields misses, not an exception — the `fetch` contract
+
+**Deferred, deliberately: `water_pct`, `grass_shrub_pct`, `albedo_proxy`.**
+These need the land-cover *class* layer, and over WMS `NLCD_2021_Land_Cover_L48`
+returns **rendered palette indices, not class codes** — the Phoenix raster came back
+holding {4, 5, 6} where NLCD classes are 11/21/…/95. `GetFeatureInfo` on the same pixel
+reports 24 (Developed, High Intensity), so index ≠ class and the mapping is
+undocumented. Inventing it would put fabricated land-cover under every downstream
+figure — the same P1 violation as inventing a catalog cost.
+
+- [ ] Read true class values — WCS is the likely route (`mrlc_display__NLCD_2021_Land_Cover_L48`
+      exists) but axis subsetting rejected both the geographic and the Albers envelope;
+      needs its own investigation
+- [ ] Then `water_pct`, `grass_shrub_pct`, `albedo_proxy`
+
+**Still open on the feature vector:** 8 of 13 unresolved. Elevation and relief are next
+and unblocked — the 3DEP point service was probed and returned 331.38 m at 1 m
+resolution for the Phoenix centroid, no key.
+
+---
+
 ## Phase A — API contract and wiring
 
 ### ✅ Task 1 · Pydantic request/response schemas · `backend/schemas/` — DONE
