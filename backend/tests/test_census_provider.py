@@ -43,10 +43,14 @@ def _square(geoid: str, w: float, s: float, e: float, n: float) -> dict:
 @pytest.fixture
 def provider(monkeypatch):
     """A provider whose two upstreams are supplied rather than fetched."""
-    def _make(groups, attributes):
-        p = CensusExposureProvider(api_key="test-key")
+    def _make(groups, attributes, *, dasymetric: bool = False):
+        p = CensusExposureProvider(api_key="test-key", dasymetric=dasymetric)
         monkeypatch.setattr(p, "_block_groups", lambda *a, **k: groups)
         monkeypatch.setattr(p, "_acs_attributes", lambda *a, **k: attributes)
+        # Third upstream, easy to forget: the dasymetric path fetches a weight
+        # raster from MRLC. Left unstubbed it makes the suite call the network,
+        # which it did until this line existed.
+        monkeypatch.setattr(p, "_weight_shares", lambda *a, **k: {})
         return p
     return _make
 
@@ -190,3 +194,92 @@ def test_the_provider_declares_no_single_resolution():
     assert p.info.resolution_m is None
     assert p.fields == ("population", "pct_over65")
     assert "ACS" in p.info.source
+
+
+# ── dasymetric weighting ─────────────────────────────────────────────────────
+
+def _groups_and_attrs():
+    return (
+        [_square("040131131001", BG_WEST, BG_SOUTH, BG_EAST, BG_NORTH)],
+        {"040131131001": {"population": 1000.0, "pct_over65": 0.1}},
+    )
+
+
+def test_weights_override_area(provider):
+    """The whole point: people follow built surface, not geometry.
+
+    Two equal-area tiles, one carrying three quarters of the block group's built
+    area, should split 750/250 rather than 500/500.
+    """
+    mid = (BG_WEST + BG_EAST) / 2
+    groups, attrs = _groups_and_attrs()
+    p = provider(groups, attrs)
+    left = _tile("left", BG_WEST, BG_SOUTH, mid, BG_NORTH)
+    right = _tile("right", mid, BG_SOUTH, BG_EAST, BG_NORTH)
+
+    result = ProviderResultStub()
+    p._apportion(
+        [left, right], groups, attrs, result,
+        weights={"040131131001": {"left": 0.75, "right": 0.25}},
+    )
+    assert result.values["left"]["population"] == pytest.approx(750.0)
+    assert result.values["right"]["population"] == pytest.approx(250.0)
+
+
+def test_shares_summing_below_one_keep_the_rest_outside_the_aoi(provider):
+    """Block groups run past the study area — measured at 2.2x wider than the
+    Phoenix AOI. Shares are normalised over the whole group, so an AOI covering
+    a third of the built area must receive a third of the residents, not all."""
+    groups, attrs = _groups_and_attrs()
+    p = provider(groups, attrs)
+    tile = _tile("t", BG_WEST, BG_SOUTH, BG_EAST, BG_NORTH)
+
+    result = ProviderResultStub()
+    p._apportion([tile], groups, attrs, result,
+                 weights={"040131131001": {"t": 0.30}})
+    assert result.values["t"]["population"] == pytest.approx(300.0)
+
+
+def test_a_group_without_weights_falls_back_to_areal(provider):
+    """Decided per group, not per run: one park with no built surface must not
+    push the whole AOI back onto the cruder method."""
+    groups, attrs = _groups_and_attrs()
+    p = provider(groups, attrs)
+    tile = _tile("t", BG_WEST, BG_SOUTH, BG_EAST, BG_NORTH)
+
+    result = ProviderResultStub()
+    p._apportion([tile], groups, attrs, result, weights={})  # no entry for the group
+    # Full areal coverage of the group → all its people.
+    assert result.values["t"]["population"] == pytest.approx(1000.0, rel=1e-6)
+
+
+def test_a_weight_surface_failure_degrades_to_areal(monkeypatch):
+    """MRLC being down must cost accuracy, not the whole exposure layer."""
+    groups, attrs = _groups_and_attrs()
+    p = CensusExposureProvider(api_key="test-key", dasymetric=True)
+    monkeypatch.setattr(p, "_block_groups", lambda *a, **k: groups)
+    monkeypatch.setattr(p, "_acs_attributes", lambda *a, **k: attrs)
+
+    def _boom(*a, **k):
+        raise ConnectionError("mrlc unreachable")
+
+    monkeypatch.setattr(p, "_weight_shares", _boom)
+    result = p.fetch([_tile("t", BG_WEST, BG_SOUTH, BG_EAST, BG_NORTH)])
+    assert result.values["t"]["population"] == pytest.approx(1000.0, rel=1e-6)
+
+
+def test_provenance_names_the_method_used():
+    """The Methods page reproduces this, so it must say which apportionment
+    actually produced the numbers."""
+    assert "dasymetric" in CensusExposureProvider(
+        api_key="k", dasymetric=True).info.source
+    assert "areally" in CensusExposureProvider(
+        api_key="k", dasymetric=False).info.source
+
+
+class ProviderResultStub:
+    """Minimal stand-in so _apportion can be exercised directly."""
+
+    def __init__(self) -> None:
+        self.values: dict = {}
+        self.misses: dict = {}
