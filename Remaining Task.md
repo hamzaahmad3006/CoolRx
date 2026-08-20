@@ -475,7 +475,21 @@ block group. They are not. A true dasymetric method weights by where buildings a
 largest single source of error in the exposure figures and is disclosed in the module,
 the schema and the Methods page rather than buried.
 
-- [ ] Weight apportionment by `impervious_pct` (dasymetric refinement)
+- [x] **Weight apportionment by `impervious_pct` — DONE 2026-08-20.** People now
+      follow built surface rather than being spread evenly. Live comparison on the
+      Phoenix tiles: `a −1.0%`, `b +26.4%`, `c +1.6%`, `d +14.9%`; AOI total 390 → 429,
+      because these downtown tiles are denser than their block groups' averages —
+      which is the correction the method exists to make.
+- [x] Weights normalised over the **whole** block group, not the AOI. Measured: the
+      Phoenix groups are 2.2× wider and 2.5× taller than the study area, so
+      normalising over AOI tiles alone would have handed the AOI ~100% of every
+      group's residents.
+- [x] Falls back to areal **per block group**, so one park with no built surface does
+      not push the whole AOI onto the cruder method
+- [x] A weight-surface outage costs accuracy, not the exposure layer
+- [x] `ProviderInfo.source` names which method produced the numbers, since the
+      Methods page reproduces it verbatim
+- [x] 5 more tests (17 total on this provider), all offline
 
 **Feature/exposure status: 5 of 13 model features + 2 of 4 exposure fields resolve.**
 

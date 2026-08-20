@@ -78,9 +78,19 @@ _TIMEOUT_SECONDS: Final[float] = 90.0
 class CensusExposureProvider(FeatureProvider):
     """Block-group population and age, areally apportioned onto tiles."""
 
-    def __init__(self, *, api_key: str | None, year: int = 2023) -> None:
+    def __init__(
+        self,
+        *,
+        api_key: str | None,
+        year: int = 2023,
+        dasymetric: bool = True,
+    ) -> None:
         self._api_key = (api_key or "").strip()
         self._year = year
+        #: Weight population by built-up surface rather than spreading it evenly.
+        #: Falls back to areal share per block group when the weight surface is
+        #: unavailable or a group contains no built area at all.
+        self._dasymetric = dasymetric
 
     @property
     def info(self) -> ProviderInfo:
@@ -91,7 +101,12 @@ class CensusExposureProvider(FeatureProvider):
             resolution_m=None,
             source=(
                 f"US Census ACS {self._year} 5-year (block group) via api.census.gov, "
-                "boundaries from TIGERweb; areally apportioned to tiles"
+                "boundaries from TIGERweb; "
+                + (
+                    "dasymetric, weighted by NLCD impervious surface"
+                    if self._dasymetric
+                    else "areally apportioned to tiles"
+                )
             ),
             vintage=f"ACS {self._year} 5-year",
         )
@@ -139,8 +154,111 @@ class CensusExposureProvider(FeatureProvider):
             result.misses = {t.tile_key: reason for t in tiles}
             return result
 
-        self._apportion(tiles, groups, attributes, result)
+        weights: dict[str, dict[str, float]] | None = None
+        if self._dasymetric:
+            try:
+                weights = self._weight_shares(tiles, groups)
+            except Exception as exc:  # noqa: BLE001 — degrade, never fail
+                log.warning("census.weights_unavailable", error=str(exc))
+                weights = None
+
+        self._apportion(tiles, groups, attributes, result, weights)
         return result
+
+    def _weight_shares(
+        self, tiles: list[Tile], groups: list[dict[str, Any]]
+    ) -> dict[str, dict[str, float]]:
+        """GEOID -> {tile_key: share of that block group's built area}.
+
+        Shares are normalised over the **whole** block group, including the part
+        outside the study area, so a group lying mostly beyond the AOI hands over
+        only the fraction of its residents that actually live inside.
+
+        Every share for a group therefore sums to at most 1, not exactly 1.
+        """
+        from shapely.geometry import box, shape
+        from shapely.strtree import STRtree
+
+        from .mrlc import fetch_percent_raster
+
+        geometries: list[Any] = []
+        geoids: list[str] = []
+        for feature in groups:
+            geoid = (feature.get("properties") or {}).get("GEOID")
+            if not geoid:
+                continue
+            geometry = shape(feature["geometry"])
+            if geometry.is_empty:
+                continue
+            geometries.append(geometry)
+            geoids.append(str(geoid))
+
+        if not geometries:
+            raise ValueError("no usable block-group geometry")
+
+        west = min(g.bounds[0] for g in geometries)
+        south = min(g.bounds[1] for g in geometries)
+        east = max(g.bounds[2] for g in geometries)
+        north = max(g.bounds[3] for g in geometries)
+
+        dataset, band = fetch_percent_raster(west, south, east, north)
+
+        tile_geoms = [box(t.west, t.south, t.east, t.north) for t in tiles]
+        tile_index = STRtree(tile_geoms)
+        group_index = STRtree(geometries)
+
+        totals: dict[str, float] = {g: 0.0 for g in geoids}
+        shares: dict[str, dict[str, float]] = {g: {} for g in geoids}
+
+        with dataset:
+            rows, cols = band.shape
+            for row in range(rows):
+                for col in range(cols):
+                    weight = float(band[row, col])
+                    # 0 built area contributes nothing; >100 is a fill code.
+                    if weight <= 0.0 or weight > 100.0:
+                        continue
+                    lon, lat = dataset.xy(row, col)
+                    from shapely.geometry import Point
+
+                    point = Point(lon, lat)
+
+                    hit_geoid: str | None = None
+                    for idx in group_index.query(point):
+                        if geometries[idx].contains(point):
+                            hit_geoid = geoids[idx]
+                            break
+                    if hit_geoid is None:
+                        continue
+
+                    # Denominator: the whole block group, AOI or not.
+                    totals[hit_geoid] += weight
+
+                    for idx in tile_index.query(point):
+                        if tile_geoms[idx].contains(point):
+                            key = tiles[idx].tile_key
+                            shares[hit_geoid][key] = (
+                                shares[hit_geoid].get(key, 0.0) + weight
+                            )
+                            break
+
+        out: dict[str, dict[str, float]] = {}
+        for geoid, total in totals.items():
+            if total <= 0.0:
+                # A block group with no built surface at all — a park, say.
+                # Areal share is the honest fallback; zeroing it would delete
+                # residents who demonstrably exist.
+                continue
+            out[geoid] = {
+                key: value / total for key, value in shares[geoid].items()
+            }
+
+        log.info(
+            "census.weights_built",
+            groups=len(out),
+            fallback_groups=len(totals) - len(out),
+        )
+        return out
 
     def _block_groups(
         self, west: float, south: float, east: float, north: float
@@ -235,14 +353,21 @@ class CensusExposureProvider(FeatureProvider):
         groups: list[dict[str, Any]],
         attributes: dict[str, dict[str, float | None]],
         result: ProviderResult,
+        weights: dict[str, dict[str, float]] | None = None,
     ) -> None:
-        """Share each block group's people across the tiles that overlap it."""
+        """Share each block group's people across the tiles that overlap it.
+
+        Uses the dasymetric weights where a group has them, and areal share
+        where it does not — decided per group, not per run, so one park with no
+        built surface does not force the whole AOI back onto the cruder method.
+        """
         from shapely.geometry import box, shape
 
-        prepared: list[tuple[Any, float, dict[str, float | None]]] = []
+        weights = weights or {}
+        prepared: list[tuple[Any, float, dict[str, float | None], str]] = []
         for feature in groups:
-            geoid = (feature.get("properties") or {}).get("GEOID")
-            attrs = attributes.get(str(geoid))
+            geoid = str((feature.get("properties") or {}).get("GEOID"))
+            attrs = attributes.get(geoid)
             if attrs is None:
                 continue
             try:
@@ -251,7 +376,7 @@ class CensusExposureProvider(FeatureProvider):
                 continue
             if geometry.is_empty or geometry.area <= 0:
                 continue
-            prepared.append((geometry, geometry.area, attrs))
+            prepared.append((geometry, geometry.area, attrs, geoid))
 
         if not prepared:
             for tile in tiles:
@@ -266,17 +391,25 @@ class CensusExposureProvider(FeatureProvider):
             weighted_over65 = 0.0
             matched = False
 
-            for geometry, area, attrs in prepared:
-                if not cell.intersects(geometry):
-                    continue
-                overlap = cell.intersection(geometry).area
-                if overlap <= 0:
-                    continue
+            for geometry, area, attrs, geoid in prepared:
                 bg_population = attrs.get("population")
                 if bg_population is None:
                     continue
 
-                share = bg_population * (overlap / area)
+                weighted = weights.get(geoid)
+                if weighted is not None:
+                    fraction = weighted.get(tile.tile_key)
+                    if not fraction:
+                        continue
+                else:
+                    if not cell.intersects(geometry):
+                        continue
+                    overlap = cell.intersection(geometry).area
+                    if overlap <= 0:
+                        continue
+                    fraction = overlap / area
+
+                share = bg_population * fraction
                 population += share
                 matched = True
 

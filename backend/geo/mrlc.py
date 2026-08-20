@@ -240,6 +240,35 @@ class _MrlcPercentLayer(FeatureProvider):
         return round(float(valid.mean()), 2)
 
 
+def fetch_percent_raster(
+    west: float,
+    south: float,
+    east: float,
+    north: float,
+    *,
+    layer: str = "NLCD_2021_Impervious_L48",
+    endpoint: str = WMS_ENDPOINT,
+) -> tuple[Any, Any]:
+    """One NLCD percentage layer over an arbitrary box, as (dataset, band).
+
+    Exposed separately from the providers because the census dasymetric weighting
+    needs impervious cover over whole *block groups*, which extend well past the
+    study area — measured at 2.2x wider and 2.5x taller than the Phoenix AOI. A
+    weight surface clipped to the AOI would normalise each block group's
+    population over only the part inside it, and hand the study area every
+    resident of a group that mostly lies outside it.
+    """
+    layer_reader = _MrlcPercentLayer(
+        name="weight_surface",
+        layer=layer,
+        field_name="weight",
+        source="NLCD Impervious Surface, USGS/MRLC",
+        vintage="2021",
+        endpoint=endpoint,
+    )
+    return layer_reader._fetch_raster(west, south, east, north)
+
+
 class ImperviousProvider(_MrlcPercentLayer):
     """`impervious_pct` from NLCD Impervious Surface."""
 
