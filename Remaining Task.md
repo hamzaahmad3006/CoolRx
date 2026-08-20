@@ -444,6 +444,62 @@ resolution for the Phoenix centroid, no key.
 
 ---
 
+### 🟡 N-12 · Census exposure provider — population + age LIVE
+
+**`geo/census.py`.** Verified live on the Phoenix AOI, 2026-08-19: three block groups
+intersect it (1,929 / 2,026 / 2,654 people), four test tiles received 61.5–144.8 people
+each at 3.6–7.0% aged 65+. 100% coverage.
+
+This is the half of the impact story that was inert. `person_heat_hours` returned
+`None` for every tile because population was unknown; it can now be computed.
+
+- [x] `population` and `pct_over65` at true block-group resolution
+- [x] Boundaries from **TIGERweb** (no key) + attributes from **ACS 5-year** (key)
+- [x] Areal apportionment, **conserves the block-group total** — which is what AC-04 checks
+- [x] `pct_over65` is population-weighted, so a tile straddling two block groups gets
+      the mix its people actually come from rather than a flat average
+- [x] 12 tests, all offline — both upstreams stubbed
+
+**`pct_poverty` deliberately not populated.** ACS publishes `B17001_002E` at **tract**
+level, not block group — verified, the block-group query returns `null` for every row.
+Serving a tract figure from a provider that declares block-group resolution would
+overstate its precision, the same way the SRS insists SVI be labelled at its true tract
+resolution. It needs its own provider with its own declared resolution.
+
+- [ ] `pct_poverty` — tract-level provider, resolution declared honestly
+- [ ] SVI — CDC/ATSDR file download, no key, also tract-level
+
+**The apportionment assumption, stated plainly:** people are spread evenly within a
+block group. They are not. A true dasymetric method weights by where buildings are, and
+`impervious_pct` from `geo/mrlc.py` is now available as exactly that weight. This is the
+largest single source of error in the exposure figures and is disclosed in the module,
+the schema and the Methods page rather than buried.
+
+- [ ] Weight apportionment by `impervious_pct` (dasymetric refinement)
+
+**Feature/exposure status: 5 of 13 model features + 2 of 4 exposure fields resolve.**
+
+### ⛔ N-13 · Elevation blocked upstream — USGS 3DEP degraded
+
+Not a code problem. Diagnosed 2026-08-19:
+
+| Endpoint | Result |
+|---|---|
+| 3DEP service metadata | ✅ HTTP 200, 11 KB — service is up |
+| `exportImage` (raster) | ❌ **504** at 80×60, 40×30 and 20×15 |
+| EPQS point query | ❌ **504**, `{"message": "Endpoint request timed out"}` after 30 s |
+| EPQS × 5 points | ❌ 2 of 5 returned, **139 seconds** |
+
+The same EPQS call returned 331.38 m in under a second earlier the same day, so this
+is a live degradation, not our request shape. No provider was shipped: at 28 s/point a
+district would take 9+ hours, and committing something unverified against a source
+returning 504s would put it in the demo path untested.
+
+- [ ] Retry USGS — likely transient
+- [ ] Or evaluate AWS Terrain Tiles (free, no key, raster) — **check its licence first**
+
+---
+
 ## Phase A — API contract and wiring
 
 ### ✅ Task 1 · Pydantic request/response schemas · `backend/schemas/` — DONE
