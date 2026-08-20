@@ -25,7 +25,7 @@ Every requirement, dataset, and feature carries a tag. The tags are load-bearing
 | **REQUIRED** | Mandated by FortyGuard's hackathon rules or by the API's hard constraints. Non-negotiable. |
 | **RECOMMENDED** | Not mandated, but materially improves a judging dimension. Build unless time-blocked. |
 | **OPTIONAL** | Genuine nice-to-have. Cut first. |
-| **PREMIUM-DEPENDENT** | Requires FortyGuard API Premium. Availability to hackathon participants is unknown. Must sit behind a feature flag and must never be on the MVP critical path. |
+| **PREMIUM-DEPENDENT** | Requires FortyGuard API Premium. **Availability RESOLVED 2026-08-18 (C-8): the hackathon key is fully Premium — every endpoint unlocked, free, 2,000,000 credits, 5 weeks.** Wherever this tag still appears below, read it as *available for the hackathon*. The feature flag and the off-the-critical-path rule are **kept anyway**: they cost nothing, and they are what makes a 403, a credit exhaustion, or a post-hackathon downgrade a non-event rather than a broken demo. |
 | **NOT SPECIFIED / TO VERIFY** | Not documented by FortyGuard. Must be empirically verified before code depends on it. |
 | **HIGH RISK** | Technically or schedule-risky for one developer in 13 days. Requires an explicit fallback or should be cut. |
 
@@ -199,7 +199,7 @@ This is deliberate. Overclaiming causality in front of domain-expert judges is t
 | G-09 | Judge-reproducible without an API key | Execution | `FIXTURE_MODE=true` + `make demo` runs the full pipeline offline |
 | G-10 | Honest model validation reported | Execution, AI safety | Grouped-by-district holdout metrics + matched-pair result published in UI and README |
 | G-11 | 2–3 minute demo that lands the value in the first 60 seconds | Communication | Recorded video; before/after view reached by 1:50 |
-| G-12 | Core product works on **API Basic only** | Risk control | All P0 features function with Premium endpoints disabled |
+| G-12 | Core product works on **API Basic only** | Risk control — *retained deliberately even though Premium is confirmed (C-8)*, so a 403 or a post-hackathon downgrade changes nothing on the P0 path | All P0 features function with Premium endpoints disabled |
 
 ## 4.2 Non-goals — deliberately excluded from the hackathon MVP
 
@@ -530,7 +530,7 @@ A nine-column table per requirement is unreadable. This section therefore uses a
 - **Inputs:** GeoJSON FeatureCollection; requested `granularity`, `start_date`, `start_time`, `filter_type`.
 - **Processing (all deterministic):**
   - Geometry is a single `Polygon`; first coordinate equals last (closed ring) — **REQUIRED** by the API.
-  - Area ≤ **10 mi²** (Basic/Startup). Configurable to 50 mi² if Premium is confirmed.
+  - Area ≤ **50 mi²** — Premium confirmed for the hackathon (C-8). Falls back to 10 mi² when `FG_PLAN=basic`.
   - All vertices within a continental-US + AK/HI bounding box, and latitude ∈ [−90, 90], longitude ∈ [−180, 180].
   - `granularity` ∈ {60, 80, 100} — **REQUIRED** exact enum.
   - `start_date` within the accepted window; `start_time` matches `HH:MM` 24-hour; `filter_type` ∈ {1, 2, 3} per Known Limitations.
@@ -922,9 +922,9 @@ A nine-column table per requirement is unreadable. This section therefore uses a
 | ID | Feature | Status |
 |---|---|---|
 | FR-026 | GeoJSON / CSV export of tiles and plan items | **P2 / OPTIONAL.** Cheap (two endpoints); build only if Day 11 is calm. |
-| FR-027 | Satellite segmentation as a ground-truth land-cover source (`POST /v1/satellite`) | **PREMIUM-DEPENDENT / P2.** Behind flag `FG_ENABLE_SATELLITE`. NLCD is the MVP source. Note the documented response field is spelled `orignal_image` (sic) — handle that exact key if implemented. |
-| FR-028 | Street-view shade audit (`POST /v1/streetview`) | **PREMIUM-DEPENDENT / P3.** Visually attractive, zero MVP dependency. |
-| FR-029 | Heat Intelligence PDF annex (`POST /v1/heat_intelligence`) | **PREMIUM-DEPENDENT / P3.** Returns a temporary signed `download_link`; takes minutes. If implemented: download immediately, never log the full signed URL, stop polling on `Completed`. |
+| FR-027 | Satellite segmentation as a ground-truth land-cover source (`POST /v1/satellite`) | **AVAILABLE (C-8 resolved) / P2.** Behind flag `FG_ENABLE_SATELLITE`. NLCD is the MVP source. Note the documented response field is spelled `orignal_image` (sic) — handle that exact key if implemented. |
+| FR-028 | Street-view shade audit (`POST /v1/streetview`) | **AVAILABLE (C-8 resolved) / P3.** Visually attractive, zero MVP dependency. |
+| FR-029 | Heat Intelligence PDF annex (`POST /v1/heat_intelligence`) | **AVAILABLE (C-8 resolved) / P3.** Returns a temporary signed `download_link`; takes minutes. If implemented: download immediately, never log the full signed URL, stop polling on `Completed`. |
 | FR-030 | Autonomous forecast watch agent (poll +12 h forecast; auto-issue a heat action brief on threshold crossing) | **P2 / OPTIONAL / HIGH RISK.** Strengthens the Agentic AI track claim but needs a scheduler, alert channel, and credit budget. Only if the MVP is complete and verified by Day 11. |
 
 ---
@@ -1455,7 +1455,7 @@ These must be resolved empirically on Day 1 and are logged in §33. **None of th
 | **C-5** | "10 mi²" labelled as resolution | Hackathon page shows "10 mi² — Hyperlocal Resolution". Known Limitations makes clear 10 mi² is the **AOI area cap**. | Treat as the AOI cap. |
 | **C-6** | filter_type 2 range | Create Heatmap: "Range of Hours, same day". Known Limitations: "Max supported range for filter_type = 2 — 23Hrs". | Cap at 23 h. |
 | **C-7** | Multi-hour `map_data` semantics | For `filter_type` 2 and 3 with `analytic_type='tcm'`, **the documentation does not state whether tile values are means, maxima, or something else.** | **P0 Day-1 verification.** Until verified, CoolRx uses `filter_type=1` (single hour) exclusively for `tcm`, where semantics are unambiguous. |
-| **C-8** | Hackathon plan tier | Not stated on the hackathon page or FAQ. | Assume **Basic**. All P0 features work on Basic. Premium features behind flags. |
+| **C-8** | Hackathon plan tier | **RESOLVED 2026-08-18** — official #announcements: the hackathon key is **fully Premium**, all endpoints unlocked and free, **2,000,000 credits, valid 5 weeks**. | `FG_PLAN=premium`; AOI cap auto-raises to 50 mi²; the three Premium flags are on. The Basic-only path is retained so a non-hackathon deployment still degrades quietly. |
 | **C-9** | Per-endpoint credit cost | Pricing page: cost "varies based on the complexity and data requirements of that request." No table. | Measure empirically on Day 1 by observing credit balance before/after a known call. Budget conservatively. |
 | **C-10** | Credits endpoint contract | Path and schema not documented in prose. | Best-effort; local counter fallback (FR-023). |
 | **C-11** | Rate limits | `429` documented; no numeric limits published. | Client-side conservative concurrency cap (default 2 concurrent submissions), backoff on 429. |
@@ -3186,7 +3186,7 @@ JOB_DEADLINE_SECONDS=1800
 FORTYGUARD_API_KEY=
 FORTYGUARD_BASE_URL=https://api.fortyguard.com/v1
 FG_PLAN=basic                           # basic | premium | startup   [TO VERIFY]
-FG_MAX_AOI_SQMI=10.0                    # 50.0 only if Premium is confirmed
+FG_MAX_AOI_SQMI=50.0                    # Premium confirmed for the hackathon [C-8]
 FG_DATE_FLOOR=2021-01-01                # stricter of the two documented floors [C-1]
 FG_DEFAULT_GRANULARITY=80               # 60 | 80 | 100 only
 FG_DEFAULT_THRESHOLD_C=35.0
@@ -3198,7 +3198,8 @@ FG_MAX_CONCURRENT_SUBMISSIONS=2         # conservative; rate limits undocumented
 FG_BREAKER_FAILURE_THRESHOLD=5
 FG_BREAKER_COOLDOWN_SECONDS=120
 
-# Premium-only features — default OFF so a 403 changes nothing
+# Premium features — ON for the hackathon (C-8). Code defaults stay off so a
+# non-hackathon deployment on Basic still degrades quietly rather than 403-ing.
 FG_ENABLE_SATELLITE=false
 FG_ENABLE_STREETVIEW=false
 FG_ENABLE_HEAT_INTELLIGENCE=false
@@ -3763,7 +3764,7 @@ Priority order when time is lost, from first sacrificed to last defended:
 | **Q-01** | Is the historical date floor 2019-01-01 or 2021-01-01? **[C-1]** | Bounds the training-set size and the earliest usable verification baseline | Submit a heatmap for 2019-06-15 and for 2020-06-15; observe accept/reject |
 | **Q-02** | Does `filter_type=4` (range of days) work? **[C-2]** | If yes, the training harvest becomes dramatically cheaper — one call per month rather than per hour | Submit with `filter_type=4` and a one-week range |
 | **Q-03** | For `filter_type` 2 and 3 with `tcm`, what do tile values represent — mean, max, or something else? **[C-7]** | Determines whether multi-hour requests are usable at all for labels | Submit filter types 1, 2, and 3 for the same AOI/day; compare tile values against the single-hour series |
-| **Q-04** | Which plan do hackathon participants receive — Basic, Premium, or Startup? **[C-8]** | Determines AOI cap, env-params breadth, and Premium availability | Call a Premium-only endpoint (`/v1/satellite`) and observe 200 vs 403; check the credits endpoint if resolvable |
+| ~~**Q-04**~~ | ~~Which plan do hackathon participants receive?~~ **ANSWERED 2026-08-18: Premium — all endpoints, 2,000,000 credits, 5 weeks** (official #announcements). No probe call needed. **[C-8]** | Was blocking the AOI cap, env-params breadth and Premium availability | Resolved from the official announcement rather than by spending a call |
 | **Q-05** | How many credits does one heatmap call consume, at each granularity? **[C-9]** | The entire harvest and demo budget depends on it | Read the credit balance, make one known call, read again |
 | **Q-06** | What is the actual end-to-end latency of a heatmap task at 60/80/100 m for a ~1.5 mi² AOI? | Drives progress UX copy, poll deadlines, and the demo's pre-warm strategy | Time ten submissions across granularities |
 
