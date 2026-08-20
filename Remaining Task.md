@@ -17,7 +17,7 @@ its own.
 | Layer | Done | Remaining |
 |---|---|---|
 | Frontend pages | ✅ 10 of 10 + drawer | — |
-| Deployment | ✅ Makefile · both Dockerfiles · CI · compose web | Docker run unverified |
+| Deployment | ✅ Makefile · both Dockerfiles · CI · compose web · demo script | ⚠️ no live URL yet |
 | Backend persistence | ✅ complete | — |
 | Backend pipeline | ✅ all modules built | raster/census providers; training on real data |
 | Backend API surface | ✅ 20 routes wired | worker stages that call the pipeline |
@@ -358,6 +358,42 @@ The test undoes both layers properly.
 - [x] Frontend attribution confirmed already present (all three map components)
 - [ ] Tick the compliance checklist in `docs/DATA_LICENSES.md` once a reviewer
       has seen both surfaces
+
+---
+
+### ✅ N-10 · Premium unlocked · SRS aligned · demo script — DONE 2026-08-19
+
+**C-8 / Q-04 are closed.** Official #announcements, 18 Aug: the hackathon key is
+**fully Premium — every endpoint unlocked, free, 2,000,000 credits, valid 5 weeks.**
+The SRS had been carrying this as unknown and defaulting to Basic since 8 Aug.
+
+- [x] `FG_PLAN=premium` in `.env` and `.env.example`
+- [x] AOI cap **10 → 50 mi²** — `config.py:201` already auto-raised it on the plan
+      switch, so this needed no new code
+- [x] `FG_ENABLE_SATELLITE` / `_STREETVIEW` / `_HEAT_INTELLIGENCE` all on
+- [x] FR-027 / FR-028 / FR-029 retagged from PREMIUM-DEPENDENT to **AVAILABLE**
+- [x] The `PREMIUM-DEPENDENT` tag definition itself now records the resolution, so the
+      11 scattered uses read correctly without 11 risky edits
+- [x] Q-04 struck from the Day-1 blocking questions — answered from an announcement
+      rather than by spending a probe call
+
+**Two things deliberately *not* changed:**
+
+`FG_CREDIT_RESERVE` stays at 50,000. Against 2,000,000 that is a 2.5% floor — sane, and
+lowering a safety margin for no reason is not an improvement.
+
+**G-12 ("core works on API Basic only") stays a goal.** Premium being available is not a
+reason to put it on the P0 path. The flags cost nothing and are what make a 403, credit
+exhaustion, or a post-hackathon downgrade a non-event instead of a broken demo.
+
+**`docs/DEMO_SCRIPT.md` written** — required by the §24.8 checklist and previously absent.
+A timed 3-minute cut (the video is a mandatory submission item), a pre-record checklist
+with the no-visible-key rule, and the §19.4 demo-day protocol. Follows FortyGuard's own
+kickoff guidance: the builder narrating beats a polished AI-produced film, and slides
+alone do not count.
+
+- [x] `docs/DEMO_SCRIPT.md`
+- [ ] Record the video against the deployed demo once one exists
 
 ---
 
