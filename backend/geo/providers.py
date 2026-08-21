@@ -213,3 +213,28 @@ REQUIRED_FEATURE_FIELDS: Final[tuple[str, ...]] = (
     "district_mean_c",
     "latitude",
 )
+
+#: Fields carried on a tile row that the model does *not* train on.
+#:
+#: Population and equity attributes answer "who is exposed", not "how hot is this
+#: tile", so feeding them to a temperature model would be a leak. They are still
+#: per-tile columns -- tile_features has held them since the initial schema --
+#: because the exposure and equity views multiply a temperature change by the
+#: people it affects, which is the step that turns degrees into person-heat-hours.
+#:
+#: Split out from REQUIRED_FEATURE_FIELDS rather than added to it: on 2026-08-21
+#: the census providers answered 144/144 tiles at full coverage and enrich_tiles
+#: discarded every value, because a row was seeded only with the required fields
+#: and anything else was dropped by `if field_name not in row`. The providers
+#: logged success, the report showed coverage 1.0, and population was null.
+EXPOSURE_FIELDS: Final[tuple[str, ...]] = (
+    "population",
+    "pct_over65",
+    "pct_poverty",
+)
+
+#: Every field a provider may legitimately emit onto a tile row.
+ENRICHABLE_FIELDS: Final[tuple[str, ...]] = (
+    *REQUIRED_FEATURE_FIELDS,
+    *EXPOSURE_FIELDS,
+)

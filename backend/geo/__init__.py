@@ -30,6 +30,8 @@ from .grid import (
     utm_epsg_for,
 )
 from .providers import (
+    ENRICHABLE_FIELDS,
+    EXPOSURE_FIELDS,
     REQUIRED_FEATURE_FIELDS,
     FeatureProvider,
     GeometryProvider,
@@ -42,6 +44,8 @@ from .tilekey import decode_geohash, encode_geohash, tile_key
 log = structlog.get_logger(__name__)
 
 __all__ = [
+    "ENRICHABLE_FIELDS",
+    "EXPOSURE_FIELDS",
     "MAX_TILES",
     "REQUIRED_FEATURE_FIELDS",
     "VALID_GRANULARITIES",
@@ -184,7 +188,7 @@ def default_providers(
         fields=("elevation_m", "local_relief_m"), build=_elevation,
     )
     _register(
-        providers, name="nlcd_water_distance", fields=("dist_to_water_m",),
+        providers, name="nhd_water_distance", fields=("dist_to_water_m",),
         build=_water,
     )
 

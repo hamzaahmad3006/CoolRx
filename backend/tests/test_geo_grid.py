@@ -22,6 +22,7 @@ from geo.grid import (
     utm_epsg_for,
 )
 from geo.providers import (
+    ENRICHABLE_FIELDS,
     REQUIRED_FEATURE_FIELDS,
     FeatureProvider,
     GeometryProvider,
@@ -302,10 +303,16 @@ def _tiles(count: int = 3) -> list[Tile]:
 
 
 def test_every_row_has_every_required_field() -> None:
-    """A missing key would let downstream code default the field into existence."""
+    """A missing key would let downstream code default the field into existence.
+
+    The row carries the exposure fields as well as the model's inputs. They are
+    not model features -- population answers who is exposed, not how hot a tile
+    is -- but they are columns on the same row, and seeding them here is what
+    stops `enrich_tiles` from dropping a census answer it never made space for.
+    """
     rows, _ = enrich_tiles(_tiles(), [GeometryProvider(hour_utc=22, doy=196)])
     for row in rows:
-        assert set(row) == {"tile_key", *REQUIRED_FEATURE_FIELDS}
+        assert set(row) == {"tile_key", *ENRICHABLE_FIELDS}
 
 
 def test_unavailable_provider_yields_nulls_not_zeros() -> None:
