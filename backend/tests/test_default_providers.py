@@ -38,7 +38,7 @@ EXPECTED_LIVE: dict[str, tuple[str, ...]] = {
     "nlcd_land_cover": ("water_pct", "grass_shrub_pct"),
     "osm_building_footprints": ("building_pct",),
     "usgs_3dep_elevation": ("elevation_m", "local_relief_m"),
-    "nlcd_water_distance": ("dist_to_water_m",),
+    "nhd_water_distance": ("dist_to_water_m",),
     "census_acs_exposure": ("population", "pct_over65"),
     "census_acs_poverty": ("pct_poverty",),
 }

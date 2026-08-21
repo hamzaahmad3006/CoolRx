@@ -24,6 +24,7 @@ import structlog
 
 from .grid import Tile
 from .providers import (
+    ENRICHABLE_FIELDS,
     REQUIRED_FEATURE_FIELDS,
     FeatureProvider,
     ProviderInfo,
@@ -76,7 +77,8 @@ def enrich_tiles(
     """Merge every provider's answers into one row per tile.
 
     Rows are shaped for `TileRepository.upsert_features`: each carries `tile_key`
-    plus every field in `REQUIRED_FEATURE_FIELDS`.
+    plus every field in `ENRICHABLE_FIELDS` -- the model's inputs and the
+    exposure attributes the equity views need.
     """
     if not tiles:
         return [], EnrichmentReport(tile_count=0)
@@ -84,7 +86,7 @@ def enrich_tiles(
     # Start from all-null. Every field therefore exists on every row from the
     # outset, and a provider's absence leaves a null rather than a missing key.
     merged: dict[str, dict[str, float | None]] = {
-        tile.tile_key: dict.fromkeys(REQUIRED_FEATURE_FIELDS, None) for tile in tiles
+        tile.tile_key: dict.fromkeys(ENRICHABLE_FIELDS, None) for tile in tiles
     }
 
     report = EnrichmentReport(tile_count=len(tiles))
@@ -96,7 +98,7 @@ def enrich_tiles(
         result: ProviderResult = provider.fetch(tiles)
         report.providers.append(result.info)
 
-        unknown = set(provider.fields) - set(REQUIRED_FEATURE_FIELDS)
+        unknown = set(provider.fields) - set(ENRICHABLE_FIELDS)
         if unknown:
             # Loud, because a provider emitting a field the schema has no column
             # for means the two have drifted apart and the value is being dropped.
@@ -132,7 +134,7 @@ def enrich_tiles(
             populated=sum(1 for row in merged.values() if row[name] is not None),
             total=len(tiles),
         )
-        for name in REQUIRED_FEATURE_FIELDS
+        for name in ENRICHABLE_FIELDS
     ]
 
     rows = [{"tile_key": key, **values} for key, values in merged.items()]
