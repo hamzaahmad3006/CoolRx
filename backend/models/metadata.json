@@ -1,0 +1,66 @@
+{
+  "model_version": "trm-2026.08.22-a3f1",
+  "feature_order": [
+    "canopy_pct",
+    "impervious_pct",
+    "building_pct",
+    "water_pct",
+    "grass_shrub_pct",
+    "albedo_proxy",
+    "openness_proxy",
+    "elevation_m",
+    "local_relief_m",
+    "dist_to_water_m",
+    "hour_utc",
+    "doy",
+    "latitude",
+    "district_mean_c"
+  ],
+  "quantiles": {
+    "p10": 0.1,
+    "p50": 0.5,
+    "p90": 0.9
+  },
+  "training_ranges": {
+    "canopy_pct": [
+      0.0,
+      14.17
+    ],
+    "impervious_pct": [
+      0.0,
+      96.93
+    ],
+    "building_pct": [
+      0.0,
+      100.0
+    ],
+    "water_pct": [
+      0.0,
+      0.0
+    ],
+    "grass_shrub_pct": [
+      0.0,
+      100.0
+    ],
+    "elevation_m": [
+      323.13,
+      746.39
+    ],
+    "local_relief_m": [
+      0.16,
+      10.37
+    ],
+    "dist_to_water_m": [
+      310.5,
+      8016.7
+    ],
+    "latitude": [
+      32.21059330067153,
+      33.45461182487597
+    ],
+    "district_mean_c": [
+      31.538379663865545,
+      37.07350218487395
+    ]
+  }
+}
