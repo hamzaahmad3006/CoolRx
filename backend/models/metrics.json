@@ -1,0 +1,54 @@
+{
+  "model_version": "trm-2026.08.22-a3f1",
+  "trained_at": "2026-08-21T17:40:52.307520+00:00",
+  "honest": true,
+  "training_rows": 2380,
+  "held_out_rows": 1163,
+  "held_out_refused_out_of_support": 1163,
+  "held_out_refusal_rate": 1.0,
+  "training_districts": [
+    "phoenix",
+    "tucson"
+  ],
+  "held_out_districts": [
+    "lasvegas"
+  ],
+  "mae_c": 2.2127,
+  "r2": -8736.4032,
+  "interval_coverage": 0.0,
+  "intervals_are_calibrated": false,
+  "features_used": [
+    "canopy_pct",
+    "impervious_pct",
+    "building_pct",
+    "water_pct",
+    "grass_shrub_pct",
+    "albedo_proxy",
+    "openness_proxy",
+    "elevation_m",
+    "local_relief_m",
+    "dist_to_water_m",
+    "hour_utc",
+    "doy",
+    "latitude",
+    "district_mean_c"
+  ],
+  "features_populated": [
+    "canopy_pct",
+    "impervious_pct",
+    "building_pct",
+    "water_pct",
+    "grass_shrub_pct",
+    "elevation_m",
+    "local_relief_m",
+    "dist_to_water_m",
+    "hour_utc",
+    "doy",
+    "latitude",
+    "district_mean_c"
+  ],
+  "features_null": [
+    "albedo_proxy",
+    "openness_proxy"
+  ]
+}
