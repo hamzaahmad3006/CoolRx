@@ -146,7 +146,7 @@ def test_a_zero_universe_produces_no_rate(monkeypatch):
                 ["0", "0", "04", "013", "113100"],
             ]
 
-    monkeypatch.setattr("httpx.get", lambda *a, **k: _Response())
+    monkeypatch.setattr("httpx.request", lambda *a, **k: _Response())
     rates = p._poverty_rates(
         [_bg("040131131001", TRACT_WEST, TRACT_SOUTH, TRACT_EAST, TRACT_NORTH)]
     )

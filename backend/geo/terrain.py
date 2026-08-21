@@ -46,6 +46,7 @@ from typing import Any, Final
 
 import structlog
 
+from . import _http
 from .grid import Tile
 from .providers import FeatureProvider, ProviderInfo, ProviderResult
 
@@ -159,7 +160,7 @@ class ElevationProvider(FeatureProvider):
             "pixelType": "F32",
             "f": "image",
         }
-        response = httpx.get(
+        response = _http.get(
             self._endpoint, params=params, timeout=_TIMEOUT_SECONDS
         )
         response.raise_for_status()

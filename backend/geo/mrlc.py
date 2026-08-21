@@ -51,6 +51,7 @@ from typing import Any, Final
 
 import structlog
 
+from . import _http
 from .grid import Tile
 from .providers import FeatureProvider, ProviderInfo, ProviderResult
 
@@ -188,7 +189,7 @@ class _MrlcPercentLayer(FeatureProvider):
             "height": str(height),
             "format": "image/geotiff",
         }
-        response = httpx.get(
+        response = _http.get(
             self._endpoint, params=params, timeout=_TIMEOUT_SECONDS
         )
         response.raise_for_status()

@@ -171,7 +171,13 @@ def run_diagnose_pipeline(
 
         hour_utc = int(start_time.split(":")[0])
         doy = date.fromisoformat(start_date).timetuple().tm_yday
-        providers = default_providers(hour_utc=hour_utc, doy=doy)
+        # The key is passed in rather than read inside `geo`, which deliberately
+        # knows nothing about config, FortyGuard or the database.
+        providers = default_providers(
+            hour_utc=hour_utc,
+            doy=doy,
+            census_api_key=settings.census_api_key,
+        )
         # Enriched against the API's tiles, so a feature row exists for exactly the
         # tiles that carry a measurement.
         enrichment_tiles = [

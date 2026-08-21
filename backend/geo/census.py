@@ -49,6 +49,7 @@ from typing import Any, Final
 
 import structlog
 
+from . import _http
 from .grid import Tile
 from .providers import FeatureProvider, ProviderInfo, ProviderResult
 
@@ -277,7 +278,7 @@ class CensusExposureProvider(FeatureProvider):
             "outSR": "4326",
             "f": "geojson",
         }
-        response = httpx.get(
+        response = _http.get(
             TIGERWEB_BLOCKGROUP_URL, params=params, timeout=_TIMEOUT_SECONDS
         )
         response.raise_for_status()
@@ -309,7 +310,7 @@ class CensusExposureProvider(FeatureProvider):
                 "in": f"state:{state} county:{county} tract:{tract}",
                 "key": self._api_key,
             }
-            response = httpx.get(
+            response = _http.get(
                 ACS_URL.format(year=self._year),
                 params=params,
                 timeout=_TIMEOUT_SECONDS,

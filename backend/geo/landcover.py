@@ -44,6 +44,7 @@ from typing import Any, Final
 
 import structlog
 
+from . import _http
 from .grid import Tile
 from .providers import FeatureProvider, ProviderInfo, ProviderResult
 
@@ -173,7 +174,7 @@ class LandCoverProvider(FeatureProvider):
                 f"Y({min(y1, y2):.1f},{max(y1, y2):.1f})",
             ],
         }
-        response = httpx.get(
+        response = _http.get(
             self._endpoint, params=params, timeout=_TIMEOUT_SECONDS
         )
         response.raise_for_status()
