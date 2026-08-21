@@ -576,6 +576,63 @@ Remaining 6: `albedo_proxy`, `openness_proxy`, `building_pct`, `elevation_m`,
 
 ---
 
+### 🟡 N-15 · Terrain, water distance and buildings — 3 of 4 features LIVE
+
+Both blocked upstreams recovered on 2026-08-21 and were re-probed before any code
+was written: 3DEP answered, Overpass answered a light query.
+
+**`geo/terrain.py` — `elevation_m`, `local_relief_m`. Verified live.**
+Phoenix AOI: elevation 331.33–331.59 m, within-tile relief 0.82–4.33 m — a flat
+desert city on a river plain, with some tiles measurably less flat than others.
+
+The point service (EPQS) works but answers one coordinate per request, and on
+2026-08-20 was taking ~28 s per point with 2 of 5 failing — nine hours for one
+district. `exportImage` returns the whole AOI as one float32 GeoTIFF instead: one
+request, ~66 KB. `pixelType=F32` matters; the default 8-bit render would quantise
+away exactly the small relief this feature measures.
+
+- [x] One raster per AOI, not one point per tile
+- [x] Void sentinels (−3.4e38) excluded **before** the mean, not after
+- [x] `local_relief_m` documented as *within-tile* spread, not a neighbourhood
+      window — a window width would be an arbitrary parameter nobody could justify
+
+**`geo/water.py` — `dist_to_water_m`. Verified live.**
+Phoenix: 2.82–3.00 km to the nearest open water, decreasing steadily north-east.
+
+- [x] Land cover fetched over the AOI **expanded by 10 km** — water that cools a
+      district is frequently outside it
+- [x] Distance transform in true metres, using metres-per-pixel at the window's own
+      latitude (a degree of longitude is ~93 km at Phoenix, not 111 km — the
+      equatorial figure would overstate every east–west distance by ~20%)
+- [x] **No water in the window → null, never a floor value.** A tile 10 km from water
+      and one 60 km from it both need a figure this method cannot produce
+
+**`geo/buildings.py` — `building_pct`. Code complete, NOT live-verified.**
+
+Overpass returned **504** from the main instance and **502** from the Kumi mirror for
+the `out geom;` query this needs, minutes after answering a light `out count;`. So
+unlike every other provider here, **no real Overpass payload has been parsed yet** —
+recorded in the module docstring rather than glossed.
+
+One thing was learned live and is now baked in: **Overpass answers 406 Not Acceptable
+to the default `python-httpx` user agent**, before it parses the query at all, so the
+failure reads as a malformed request rather than a blocked client. Their usage policy
+also asks callers to identify themselves.
+
+- [x] Single query per AOI — a per-tile query would be ~1,200 requests against a
+      donated service per diagnosis
+- [x] User-Agent set and asserted in tests
+- [x] Overlapping footprints capped at 100% — OSM footprints do overlap
+- [x] An AOI with nothing mapped → null, not 0%: far more likely unsurveyed than empty
+- [ ] **Verify against a live Overpass response before these numbers are shown**
+
+- [x] 27 tests across the three, all offline. Suite: **600 passed, 38 skipped, 0 failed**
+
+**Model features: 11 of 13 resolve.** Remaining: `albedo_proxy` (needs a citable
+per-class reflectance table) and `openness_proxy` (needs building heights).
+
+---
+
 ## Phase A — API contract and wiring
 
 ### ✅ Task 1 · Pydantic request/response schemas · `backend/schemas/` — DONE
