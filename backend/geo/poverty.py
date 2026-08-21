@@ -50,6 +50,7 @@ from typing import Any, Final
 
 import structlog
 
+from . import _http
 from .grid import Tile
 from .providers import FeatureProvider, ProviderInfo, ProviderResult
 
@@ -170,7 +171,7 @@ class PovertyProvider(FeatureProvider):
                 "in": f"state:{state} county:{county}",
                 "key": self._api_key,
             }
-            response = httpx.get(
+            response = _http.get(
                 ACS_URL.format(year=self._year),
                 params=params,
                 timeout=_TIMEOUT_SECONDS,

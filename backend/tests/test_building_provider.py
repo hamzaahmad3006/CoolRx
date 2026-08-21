@@ -120,11 +120,11 @@ def test_a_user_agent_is_sent(monkeypatch):
         def raise_for_status(self): return None
         def json(self): return {"elements": []}
 
-    def _post(url, **kwargs):
+    def _post(method, url, **kwargs):
         captured.update(kwargs)
         return _Response()
 
-    monkeypatch.setattr("httpx.post", _post)
+    monkeypatch.setattr("httpx.request", _post)
     BuildingFootprintProvider()._footprints(WEST, SOUTH, EAST, NORTH)
 
     assert captured["headers"]["User-Agent"] == _USER_AGENT
@@ -148,7 +148,7 @@ def test_malformed_geometry_is_skipped_not_fatal(monkeypatch):
                 ]},
             ]}
 
-    monkeypatch.setattr("httpx.post", lambda url, **k: _Response())
+    monkeypatch.setattr("httpx.request", lambda *a, **k: _Response())
     footprints = BuildingFootprintProvider()._footprints(WEST, SOUTH, EAST, NORTH)
     assert len(footprints) == 1
 

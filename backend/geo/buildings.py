@@ -50,6 +50,7 @@ from typing import Any, Final
 
 import structlog
 
+from . import _http
 from .grid import Tile
 from .providers import FeatureProvider, ProviderInfo, ProviderResult
 
@@ -150,7 +151,7 @@ class BuildingFootprintProvider(FeatureProvider):
             f'relation["building"]({south},{west},{north},{east}););'
             "out geom;"
         )
-        response = httpx.post(
+        response = _http.post(
             self._endpoint,
             data={"data": query},
             headers={"User-Agent": _USER_AGENT},
