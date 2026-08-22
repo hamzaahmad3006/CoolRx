@@ -13,8 +13,7 @@
     "dist_to_water_m",
     "hour_utc",
     "doy",
-    "latitude",
-    "district_mean_c"
+    "latitude"
   ],
   "quantiles": {
     "p10": 0.1,
@@ -24,11 +23,11 @@
   "training_ranges": {
     "canopy_pct": [
       0.0,
-      14.17
+      46.6
     ],
     "impervious_pct": [
       0.0,
-      96.93
+      99.0
     ],
     "building_pct": [
       0.0,
@@ -36,31 +35,27 @@
     ],
     "water_pct": [
       0.0,
-      0.0
+      88.0
     ],
     "grass_shrub_pct": [
       0.0,
       100.0
     ],
     "elevation_m": [
-      323.13,
-      746.39
+      290.82,
+      675.22
     ],
     "local_relief_m": [
-      0.16,
-      10.37
+      0.13,
+      38.04
     ],
     "dist_to_water_m": [
-      310.5,
-      8016.7
+      0.0,
+      5349.3
     ],
     "latitude": [
-      32.21059330067153,
-      33.45461182487597
-    ],
-    "district_mean_c": [
-      31.538379663865545,
-      37.07350218487395
+      33.39454674785723,
+      36.220994977816986
     ]
   }
 }

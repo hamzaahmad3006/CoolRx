@@ -471,11 +471,13 @@ def _attribute(
             {
                 "tile_key": tile_key,
                 "model_version": model.model_version,
-                "predicted_anomaly_c": Decimal(
-                    str(round(prediction.value - district_mean_c, 3))
-                ),
-                "ci_low_c": Decimal(str(round(prediction.low - district_mean_c, 3))),
-                "ci_high_c": Decimal(str(round(prediction.high - district_mean_c, 3))),
+                # The model is trained on the anomaly against the district
+                # baseline, so its output IS the anomaly. Subtracting the mean
+                # again here would apply the correction twice and report every
+                # tile as roughly one district-mean too cold.
+                "predicted_anomaly_c": Decimal(str(round(prediction.value, 3))),
+                "ci_low_c": Decimal(str(round(prediction.low, 3))),
+                "ci_high_c": Decimal(str(round(prediction.high, 3))),
                 "shap": contributions,
                 "top_driver": max(
                     contributions, key=lambda name: abs(contributions[name])

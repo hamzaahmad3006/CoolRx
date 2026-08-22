@@ -62,10 +62,6 @@ def _tile(**overrides: float | None) -> dict[str, float | None]:
         "hour_utc": 22.0,
         "doy": 196.0,
         "latitude": 33.45,
-        # The district baseline the tile is measured against. Not fetched:
-        # derived from the FortyGuard field, the same way the live pipeline
-        # derives it.
-        "district_mean_c": 37.0,
     }
     base.update(overrides)
     return base

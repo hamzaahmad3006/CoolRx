@@ -42,7 +42,6 @@ FEATURE_ORDER: Final[tuple[str, ...]] = (
     "hour_utc",
     "doy",
     "latitude",
-    "district_mean_c",
 )
 
 #: Features an intervention can plausibly change. The counterfactual transform is
@@ -68,7 +67,6 @@ FEATURE_BOUNDS: Final[dict[str, tuple[float, float]]] = {
     "building_pct": (0.0, 100.0),
     "water_pct": (0.0, 100.0),
     "grass_shrub_pct": (0.0, 100.0),
-    "district_mean_c": (-30.0, 60.0),
     "albedo_proxy": (0.0, 1.0),
     "openness_proxy": (0.0, 1.0),
     "elevation_m": (-100.0, 5000.0),
