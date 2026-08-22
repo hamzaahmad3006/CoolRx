@@ -81,6 +81,31 @@ DISTRICTS: dict[str, District] = {
         start_time="22:00",
         threshold_c=35.0,
     ),
+
+    "phoenix_city": District(
+        key="phoenix_city",
+        name="Central Phoenix, AZ — city scale",
+        west=-112.1431, south=33.394, east=-112.0269, north=33.491,
+        start_date="2025-07-15",
+        start_time="22:00",
+        threshold_c=35.0,
+    ),
+    "lasvegas_city": District(
+        key="lasvegas_city",
+        name="Las Vegas, NV — city scale",
+        west=-115.205, south=36.124, east=-115.085, north=36.221,
+        start_date="2025-07-16",
+        start_time="22:00",
+        threshold_c=35.0,
+    ),
+    "tucson_city": District(
+        key="tucson_city",
+        name="Tucson, AZ — city scale",
+        west=-111.0223, south=32.174, east=-110.9077, north=32.271,
+        start_date="2025-07-17",
+        start_time="22:00",
+        threshold_c=35.0,
+    ),
 }
 
 
@@ -124,9 +149,19 @@ def _payload(
 
 
 def _plan(
-    district: District, granularity: int, ladder_steps: int
+    district: District, granularity: int, ladder_steps: int, *, tcm_only: bool = False
 ) -> list[tuple[str, float | None]]:
-    """Every call a district needs, in order."""
+    """Every call a district needs, in order.
+
+    `tcm_only` captures the temperature field alone, for training. The city-scale
+    AOIs exist to give the model land-cover contrast to learn from, and the eleven
+    exceedance rungs are a demo concern the small district fixtures already cover
+    -- capturing the full ladder over 45 sq mi would spend fourteen calls and tens
+    of megabytes per district to answer a question nothing asks at that scale.
+    """
+    if tcm_only:
+        return [("tcm", None)]
+
     calls: list[tuple[str, float | None]] = [
         ("tcm", None),
         ("time_of_measure", None),
@@ -139,16 +174,23 @@ def _plan(
     return calls
 
 
-def harvest(district: District, *, dry_run: bool) -> int:
+def harvest(
+    district: District, *, dry_run: bool, tcm_only: bool = False,
+    granularity: int | None = None,
+) -> int:
     settings = get_settings()
     fixture_dir = Path(settings.fixture_dir)
     fixture_dir.mkdir(parents=True, exist_ok=True)
 
-    calls = _plan(district, settings.fg_default_granularity, settings.fg_ladder_steps)
+    granularity = granularity or settings.fg_default_granularity
+    calls = _plan(
+        district, granularity, settings.fg_ladder_steps, tcm_only=tcm_only
+    )
 
     print(f"\n{district.name}  ({district.key})")
     print(f"  window     {district.start_date} {district.start_time} UTC")
     print(f"  threshold  {district.threshold_c} °C")
+    print(f"  granularity {granularity} m")
     print(f"  calls      {len(calls)}")
 
     captured = 0
@@ -159,7 +201,7 @@ def harvest(district: District, *, dry_run: bool) -> int:
             payload = _payload(
                 district,
                 analytic=analytic,
-                granularity=settings.fg_default_granularity,
+                granularity=granularity,
                 threshold=threshold,
             )
             digest = compute_request_hash("heatmap", payload)
@@ -196,7 +238,7 @@ def harvest(district: District, *, dry_run: bool) -> int:
             payload = _payload(
                 district,
                 analytic=analytic,
-                granularity=settings.fg_default_granularity,
+                granularity=granularity,
                 threshold=threshold,
             )
             digest = compute_request_hash("heatmap", payload)
@@ -252,6 +294,17 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Show what would be fetched and what it costs, without spending",
     )
+    parser.add_argument(
+        "--tcm-only",
+        action="store_true",
+        help="Capture the temperature field only (1 call), not the full ladder",
+    )
+    parser.add_argument(
+        "--granularity",
+        type=int,
+        choices=(60, 80, 100),
+        help="Override the tile size; coarser keeps a large AOI's fixture small",
+    )
     args = parser.parse_args(argv)
 
     if args.list:
@@ -268,7 +321,10 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("choose --district NAME, or --all, or --list")
 
     for district in targets:
-        code = harvest(district, dry_run=args.dry_run)
+        code = harvest(
+            district, dry_run=args.dry_run, tcm_only=args.tcm_only,
+            granularity=args.granularity,
+        )
         if code != 0:
             return code
     return 0
