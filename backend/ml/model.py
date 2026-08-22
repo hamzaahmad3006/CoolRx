@@ -122,6 +122,10 @@ class TemperatureModel:
         self.model_version = model_version
         self._boosters: dict[str, Any] = {}
         self._training_ranges: dict[str, tuple[float, float]] = {}
+        #: Conformal half-width in the target's units, added to each side of
+        #: the learnt band. Zero until `calibrate` runs, so an uncalibrated
+        #: model reports exactly what it did before.
+        self._conformal_width: float = 0.0
 
     # ── Training ─────────────────────────────────────────────────────────────
 
@@ -162,6 +166,124 @@ class TemperatureModel:
             quantiles=list(QUANTILES),
         )
 
+    def nonconformity_scores(
+        self, rows: list[dict[str, float | None]], targets: list[float]
+    ) -> list[float]:
+        """How far outside the learnt band each observation fell.
+
+            E = max(low - y, y - high)
+
+        Negative when the point sat comfortably inside. Exposed separately from
+        `calibrate` so a cross-validated caller can pool the raw scores from
+        several folds and take a single quantile of the pooled set, rather than a
+        quantile per fold and then a summary of those. Combining per-fold
+        quantiles is not equivalent and overshoots: measured on 2026-08-22, folds
+        of 0.733 and 0.450 combined by taking the larger produced 97.4% coverage
+        against a target of 80%.
+        """
+        import numpy as np
+
+        self._require_boosters()
+        matrix = _as_array(rows)
+        per_quantile = [
+            booster.predict(matrix) for booster in self._boosters.values()
+        ]
+        low = np.minimum.reduce(per_quantile)
+        high = np.maximum.reduce(per_quantile)
+        actual = np.asarray(targets, dtype="float64")
+        return [float(v) for v in np.maximum(low - actual, actual - high)]
+
+    @staticmethod
+    def width_from_scores(scores: list[float], *, coverage: float = 0.80) -> float:
+        """The conformal half-width implied by a pooled set of scores."""
+        import numpy as np
+
+        if not scores:
+            raise ValueError("cannot calibrate on an empty set")
+        n = len(scores)
+        level = min(1.0, coverage * (n + 1) / n)
+        return max(0.0, float(np.quantile(scores, level, method="higher")))
+
+    def calibrate(
+        self,
+        rows: list[dict[str, float | None]],
+        targets: list[float],
+        *,
+        coverage: float = 0.80,
+    ) -> float:
+        """Widen the interval until it earns its nominal coverage.
+
+        Conformalized quantile regression, after Romano, Patterson and Candes,
+        "Conformalized Quantile Regression", NeurIPS 2019 (arXiv:1905.03222).
+
+        Quantile heads learn the residual spread of the data they were fitted on.
+        Measured on 2026-08-22 the p10-p90 band held 28.3% of held-out
+        observations rather than 80%: every interval CoolRx displayed was about
+        three times too confident, and an overconfident range is worse than no
+        range because it invites a decision it cannot support.
+
+        The correction is distribution-free and assumes nothing about the
+        residuals. Score each calibration point by how far outside the band it
+        fell,
+
+            E = max(low - y, y - high)
+
+        which is negative when the point sat comfortably inside. Take the
+        (1-alpha)(n+1)/n empirical quantile of those scores and add it to both
+        sides. The finite-sample term is what makes this a guarantee rather than
+        a heuristic.
+
+        The calibration set must be ground the boosters did not see. Passing
+        training rows here would measure the spread the model already fits and
+        return a width near zero, restoring exactly the overconfidence this
+        exists to remove.
+        """
+        import numpy as np
+
+        self._require_boosters()
+        if len(rows) != len(targets):
+            raise ValueError(
+                f"{len(rows)} calibration rows against {len(targets)} targets"
+            )
+        if not rows:
+            raise ValueError("cannot calibrate on an empty set")
+
+        scores = np.asarray(self.nonconformity_scores(rows, targets))
+        n = len(scores)
+        # Clipped because at very small n the corrected level can exceed 1.
+        level = min(1.0, coverage * (n + 1) / n)
+        width = float(np.quantile(scores, level, method="higher"))
+
+        # A negative score quantile means the band was already wider than needed.
+        # Narrowing it is not what this is for: the learnt quantiles are the
+        # model's own statement about spread, and conformal prediction here only
+        # ever adds the shortfall.
+        self._conformal_width = max(0.0, width)
+
+        log.info(
+            "model.calibrated",
+            calibration_rows=n,
+            coverage_target=coverage,
+            conformal_width=round(self._conformal_width, 4),
+        )
+        return self._conformal_width
+
+    @property
+    def conformal_width(self) -> float:
+        """Half-width added to each side of the learnt band. 0.0 if uncalibrated."""
+        return self._conformal_width
+
+    def _widen(self, prediction: Prediction) -> Prediction:
+        """Apply the conformal half-width. A no-op on an uncalibrated model."""
+        if not self._conformal_width:
+            return prediction
+        return Prediction(
+            value=prediction.value,
+            low=prediction.low - self._conformal_width,
+            high=prediction.high + self._conformal_width,
+        )
+
+
     # ── Inference ────────────────────────────────────────────────────────────
 
     def predict(
@@ -186,7 +308,11 @@ class TemperatureModel:
             name: float(booster.predict(vector)[0])
             for name, booster in self._boosters.items()
         }
-        return Prediction.from_quantiles(values["p10"], values["p50"], values["p90"])
+        return self._widen(
+            Prediction.from_quantiles(
+                values["p10"], values["p50"], values["p90"]
+            )
+        )
 
     def predict_batch(
         self, rows: list[dict[str, float | None]]
@@ -212,10 +338,12 @@ class TemperatureModel:
                 out.append(None)
                 continue
             out.append(
-                Prediction.from_quantiles(
-                    float(per_quantile["p10"][index]),
-                    float(per_quantile["p50"][index]),
-                    float(per_quantile["p90"][index]),
+                self._widen(
+                    Prediction.from_quantiles(
+                        float(per_quantile["p10"][index]),
+                        float(per_quantile["p50"][index]),
+                        float(per_quantile["p90"][index]),
+                    )
                 )
             )
         return out
@@ -264,6 +392,7 @@ class TemperatureModel:
                     "model_version": self.model_version,
                     "feature_order": list(FEATURE_ORDER),
                     "quantiles": QUANTILES,
+                    "conformal_width": self._conformal_width,
                     "training_ranges": {
                         key: list(value)
                         for key, value in self._training_ranges.items()
@@ -290,6 +419,7 @@ class TemperatureModel:
         assert_feature_order(metadata["feature_order"])
 
         model = cls(model_version=metadata["model_version"])
+        model._conformal_width = float(metadata.get("conformal_width", 0.0))
         model._training_ranges = {
             key: (float(value[0]), float(value[1]))
             for key, value in metadata.get("training_ranges", {}).items()

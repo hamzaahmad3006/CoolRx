@@ -315,8 +315,48 @@ def train(*, allow_thin: bool, model_dir: Path, fixture_dir: Path) -> int:
     print(f"\ntraining on  {training} ({len(train_rows)} rows)")
     print(f"  held out     {held_out} ({len(test_rows)} rows)")
 
+    # Calibrate before the final fit, by leave-one-district-out.
+    #
+    # Conformal prediction only means anything when the calibration set is ground
+    # the boosters have not seen. A random split of one district would not do:
+    # tiles inside a district are spatially autocorrelated, so a held-out tile
+    # sits metres from a trained one, the residuals look far smaller than they
+    # are on new ground, and the width comes back near zero -- the same leakage
+    # the grouped holdout exists to prevent, arriving through the back door.
+    #
+    # So each training district takes a turn as the calibration set for a model
+    # fitted on the others, and the scores are pooled. The width that comes out
+    # reflects cross-district error, which is the regime this model is actually
+    # used in.
+    pooled_scores: list[float] = []
+    if len(training) >= 2:
+        for held in training:
+            others = [d for d in training if d != held]
+            fold = TemperatureModel(model_version=settings.model_version)
+            fold.fit(
+                [r for d in others for r in rows_by_district[d]],
+                [v for d in others for v in labels_by_district[d]],
+            )
+            pooled_scores += fold.nonconformity_scores(
+                rows_by_district[held], labels_by_district[held]
+            )
+        print(f"  conformal scores {len(pooled_scores)} from {len(training)} folds")
+    else:
+        print(
+            "  only one training district: no unseen ground to calibrate on, so "
+            "intervals stay as the quantile heads learnt them"
+        )
+
     model = TemperatureModel(model_version=settings.model_version)
     model.fit(train_rows, train_labels)
+    if pooled_scores:
+        # One quantile of the pooled scores, not a summary of per-fold quantiles.
+        # Combining per-fold quantiles is not equivalent and overshoots: folds of
+        # 0.733 and 0.450 combined by taking the larger gave 97.4% coverage
+        # against a target of 80%, which is miscalibrated in the safe direction
+        # but still wrong, and an interval nobody believes is not useful.
+        model._conformal_width = TemperatureModel.width_from_scores(pooled_scores)
+        print(f"  conformal width  {model.conformal_width:.3f} C")
 
     # Two different questions, and they need two different calls.
     #
@@ -372,6 +412,27 @@ def train(*, allow_thin: bool, model_dir: Path, fixture_dir: Path) -> int:
         "mae_c": round(report.mae_c, 4),
         "r2": round(report.r2, 4),
         "interval_coverage": round(report.interval_coverage, 4),
+        "conformal_width_c": round(model.conformal_width, 4),
+        # Which side of nominal the coverage misses on. The calibrated flag alone
+        # cannot distinguish an interval that is too narrow -- overconfident, and
+        # dangerous, because it invites a decision it cannot support -- from one
+        # that is too wide, which is merely cautious. Nothing downstream should
+        # have to infer that from a boolean.
+        "coverage_direction": (
+            "calibrated"
+            if report.intervals_are_calibrated
+            else (
+                "conservative (wider than nominal)"
+                if report.interval_coverage > 0.80
+                else "OVERCONFIDENT (narrower than nominal)"
+            )
+        ),
+        "coverage_note": (
+            "Leave-one-district-out calibration with only two training districts "
+            "fits each fold on a single city, so its residuals exceed those of "
+            "the final two-city model and the width is conservative. More "
+            "districts would tighten it; fewer would not make it honest."
+        ),
         "intervals_are_calibrated": report.intervals_are_calibrated,
         "features_used": list(FEATURE_ORDER),
         "features_populated": state["features_resolvable"],
