@@ -49,7 +49,7 @@ log = structlog.get_logger(__name__)
 
 #: Cache format. Bump when the row shape or the provider set changes in a way
 #: that makes previously-cached rows wrong rather than merely stale.
-CACHE_VERSION = 3
+CACHE_VERSION = 4
 
 
 def _tile_key(parsed: Any, index: int) -> str:
@@ -112,7 +112,7 @@ def enriched_rows(
     *,
     census_api_key: str | None = None,
     refresh: bool = False,
-) -> tuple[list[dict[str, float | None]], list[float]]:
+) -> tuple[list[dict[str, float | None]], list[float], float | None]:
     """Feature rows and matching labels for one district.
 
     Rows carry exactly `FEATURE_ORDER`, in that order, so the caller can hand
@@ -123,16 +123,42 @@ def enriched_rows(
 
     if cache_path.exists() and not refresh:
         cached = json.loads(cache_path.read_text(encoding="utf-8"))
+
+        # v3 held the same enrichment, differing only in where the district mean
+        # lived: on every row as a feature, rather than once per district. The
+        # network work is identical, so it is migrated rather than re-fetched --
+        # re-enriching three city-scale districts costs about twenty minutes of
+        # requests to free services to arrive at bytes already on disk.
+        if cached.get("cache_version") == 3 and cached.get("labels"):
+            labels = cached["labels"]
+            cached = {
+                **cached,
+                "cache_version": CACHE_VERSION,
+                "rows": [
+                    {k: v for k, v in row.items() if k != "district_mean_c"}
+                    for row in cached["rows"]
+                ],
+                "district_mean_c": sum(labels) / len(labels),
+            }
+            cache_path.write_text(
+                json.dumps(cached, separators=(",", ":")), encoding="utf-8"
+            )
+            log.info("enrichment.cache_migrated", district=district, from_version=3)
+
         if cached.get("cache_version") == CACHE_VERSION:
             log.info(
                 "enrichment.cache_hit", district=district, rows=len(cached["rows"])
             )
-            return cached["rows"], cached["labels"]
+            return (
+                cached["rows"],
+                cached["labels"],
+                cached.get("district_mean_c"),
+            )
         log.info("enrichment.cache_stale", district=district)
 
     tiles, labels_by_key = _to_tiles(parsed_tiles)
     if not tiles:
-        return [], []
+        return [], [], None
 
     hour_utc, doy = _hour_and_doy(parsed_tiles)
     providers = default_providers(
@@ -167,9 +193,7 @@ def enriched_rows(
     rows: list[dict[str, float | None]] = []
     labels: list[float] = []
     for row, label in matched:
-        vector = {name: row.get(name) for name in FEATURE_ORDER}
-        vector["district_mean_c"] = district_mean
-        rows.append(vector)
+        rows.append({name: row.get(name) for name in FEATURE_ORDER})
         labels.append(label)
 
     cache_path.write_text(
@@ -179,6 +203,7 @@ def enriched_rows(
                 "district": district,
                 "rows": rows,
                 "labels": labels,
+                "district_mean_c": district_mean,
                 "coverage": {
                     field.field_name: field.populated for field in report.field_coverage
                 },
@@ -195,4 +220,4 @@ def enriched_rows(
         rows=len(rows),
         unavailable=report.unavailable,
     )
-    return rows, labels
+    return rows, labels, district_mean

@@ -80,7 +80,7 @@ KNOWN_UNSOURCED: frozenset[str] = frozenset({"albedo_proxy", "openness_proxy"})
 #: `district_mean_c` is derived from the FortyGuard measurements themselves --
 #: `apply_district_mean` does the same thing in the live pipeline -- so no
 #: provider answers for it and its absence from the chain is not a gap.
-DERIVED_FEATURES: frozenset[str] = frozenset({"district_mean_c"})
+DERIVED_FEATURES: frozenset[str] = frozenset()
 
 
 class NotReady(RuntimeError):
@@ -262,10 +262,28 @@ def train(*, allow_thin: bool, model_dir: Path, fixture_dir: Path) -> int:
     for district in sorted(by_district):
         tiles = by_district[district]
         print(f"  enriching {district} ({len(tiles)} labelled tiles) ...", flush=True)
-        rows, labels = enriched_rows(
+        rows, labels, district_mean = enriched_rows(
             district, tiles, feature_dir,
             census_api_key=settings.census_api_key,
         )
+        if district_mean is None:
+            print(f"    no district mean for {district}; skipping")
+            continue
+        # The model predicts an ANOMALY against the district baseline, not an
+        # absolute temperature.
+        #
+        # Absolute was tried first, with district_mean_c as a fourteenth feature.
+        # It cannot work: LightGBM is an ensemble of trees, and a tree cannot
+        # extrapolate beyond the values it was split on. Trained on Phoenix
+        # (36.8 C) and Las Vegas (34.6 C) it can only ever emit a baseline in that
+        # band, so held-out Tucson at 31.2 C was predicted about 3.5 C too hot no
+        # matter what the land cover said. MAE 3.579, R2 -103.
+        #
+        # Subtracting the baseline puts every district's target around zero, which
+        # is also the quantity the product actually publishes: `pipeline.py`
+        # records `predicted_anomaly_c`, and a counterfactual is a difference of
+        # two predictions in which any shared baseline cancels anyway.
+        labels = [label - district_mean for label in labels]
         if not rows:
             print(f"    no usable rows for {district}; skipping")
             continue
@@ -350,6 +368,7 @@ def train(*, allow_thin: bool, model_dir: Path, fixture_dir: Path) -> int:
         "held_out_refusal_rate": round(refusal_rate, 4),
         "training_districts": report.training_districts,
         "held_out_districts": report.held_out_districts,
+        "target": "anomaly_vs_district_mean_c",
         "mae_c": round(report.mae_c, 4),
         "r2": round(report.r2, 4),
         "interval_coverage": round(report.interval_coverage, 4),
