@@ -190,7 +190,20 @@ class WaterDistanceProvider(FeatureProvider):
 
         from shapely.ops import unary_union
 
-        water = unary_union(geometries)
+        # Project the water once, not once per tile. Reprojecting the union
+        # inside the loop made a 34,640-tile training run take longer than an
+        # hour for a calculation that takes seconds -- shapely does the geometry
+        # work quickly, and pyproj was being asked to redo all of it 11,000 times
+        # per district.
+        try:
+            water = self._to_utm(
+                unary_union(geometries), (west + east) / 2, (south + north) / 2
+            )
+        except Exception as exc:  # noqa: BLE001 — a projection failure is a miss
+            log.warning("water.projection_failed", error=str(exc))
+            reason = f"water distance unavailable: {type(exc).__name__}"
+            result.misses = {t.tile_key: reason for t in tiles}
+            return result
 
         answered = 0
         for tile in tiles:
@@ -298,25 +311,35 @@ class WaterDistanceProvider(FeatureProvider):
 
     # ── distance ─────────────────────────────────────────────────────────────
 
+    def _to_utm(self, geometry: Any, mid_lon: float, mid_lat: float) -> Any:
+        """Reproject one geometry into the AOI's UTM zone.
+
+        Shapely measures in whatever units it is given, and in degrees an
+        east-west distance is understated by about a fifth at Phoenix's latitude.
+        """
+        from pyproj import Transformer
+        from shapely.ops import transform
+
+        epsg = utm_epsg_for(mid_lon, mid_lat)
+        self._transformer = Transformer.from_crs(
+            "EPSG:4326", f"EPSG:{epsg}", always_xy=True
+        )
+        return transform(self._transformer.transform, geometry)
+
     def _distance(
-        self, water: Any, tile: Tile, mid_lon: float, mid_lat: float
+        self, water_utm: Any, tile: Tile, mid_lon: float, mid_lat: float
     ) -> float | None:
         """Metres from the tile centroid to the nearest water geometry.
 
-        Both sides are projected to the AOI's UTM zone first. Shapely measures in
-        the units of whatever it is given, and in degrees that would understate
-        east-west distance by about a fifth at this latitude.
+        `water_utm` is already projected; only the single centroid point is
+        transformed here.
         """
         try:
-            from pyproj import Transformer
             from shapely.geometry import Point
-            from shapely.ops import transform
 
-            epsg = utm_epsg_for(mid_lon, mid_lat)
-            to_utm = Transformer.from_crs("EPSG:4326", f"EPSG:{epsg}", always_xy=True)
-
-            water_utm = transform(to_utm.transform, water)
-            x, y = to_utm.transform(tile.centroid_lon, tile.centroid_lat)
+            x, y = self._transformer.transform(
+                tile.centroid_lon, tile.centroid_lat
+            )
             return round(float(water_utm.distance(Point(x, y))), 1)
         except Exception as exc:  # noqa: BLE001 — a projection failure is a miss
             log.warning("water.projection_failed", error=str(exc))

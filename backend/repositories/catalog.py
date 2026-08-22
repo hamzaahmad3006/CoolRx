@@ -21,6 +21,8 @@ defaults would defeat the entire citation chain.
 
 from __future__ import annotations
 
+import json
+
 import csv
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
@@ -87,7 +89,7 @@ class CatalogRow:
     delta_c_high: Decimal
     lifespan_years: int
     maintenance_usd_yr: Decimal
-    feasibility_rule: str
+    feasibility_rule: dict[str, Any]
     source_citation: str
 
 
@@ -164,6 +166,39 @@ def validate_row(
     assert cost is not None and low is not None and high is not None
     assert maintenance is not None and lifespan is not None
 
+    # The column is documented as "JSON of tile-feature preconditions", and the
+    # database column is JSONB, but this parser used to hand the raw string
+    # through untouched. `check_feasibility` starts with `isinstance(rule, dict)`,
+    # so a string meant every rule in the shipped catalog was silently skipped --
+    # the tree row's `max_canopy_pct: 40` had never once excluded a tile, and a
+    # cool roof was offered on parkland with no buildings. Nothing failed, because
+    # an ignored precondition looks exactly like a satisfied one.
+    rule_raw = (raw.get("feasibility_rule") or "").strip() or "{}"
+    try:
+        rule = json.loads(rule_raw)
+    except json.JSONDecodeError as exc:
+        fail("feasibility_rule", f"is not valid JSON: {exc}")
+        rule = {}
+    if not isinstance(rule, dict):
+        fail(
+            "feasibility_rule",
+            f"must be a JSON object, got {type(rule).__name__}",
+        )
+        rule = {}
+
+    # A key the optimizer does not recognise is not an error anywhere downstream;
+    # it is simply never applied. Rejecting it here is the only place the silence
+    # can be broken.
+    from optimizer.counterfactual import _RULE_KEYS
+
+    for key in rule:
+        if key not in _RULE_KEYS:
+            fail(
+                "feasibility_rule",
+                f"key {key!r} is not one the optimizer applies, so the rule would "
+                f"be ignored; expected one of {sorted(_RULE_KEYS)}",
+            )
+
     return (
         CatalogRow(
             code=code,
@@ -175,7 +210,7 @@ def validate_row(
             delta_c_high=high,
             lifespan_years=lifespan,
             maintenance_usd_yr=maintenance,
-            feasibility_rule=(raw.get("feasibility_rule") or "{}").strip() or "{}",
+            feasibility_rule=rule,
             source_citation=citation,
         ),
         [],
