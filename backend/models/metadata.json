@@ -20,6 +20,7 @@
     "p50": 0.5,
     "p90": 0.9
   },
+  "conformal_width": 0.6013857167202928,
   "training_ranges": {
     "canopy_pct": [
       0.0,

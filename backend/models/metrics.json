@@ -1,6 +1,6 @@
 {
   "model_version": "trm-2026.08.22-a3f1",
-  "trained_at": "2026-08-22T15:27:02.996678+00:00",
+  "trained_at": "2026-08-22T15:40:47.370129+00:00",
   "honest": true,
   "training_rows": 23192,
   "held_out_rows": 11448,
@@ -16,7 +16,10 @@
   "target": "anomaly_vs_district_mean_c",
   "mae_c": 0.2729,
   "r2": -0.0091,
-  "interval_coverage": 0.283,
+  "interval_coverage": 0.9299,
+  "conformal_width_c": 0.6014,
+  "coverage_direction": "conservative (wider than nominal)",
+  "coverage_note": "Leave-one-district-out calibration with only two training districts fits each fold on a single city, so its residuals exceed those of the final two-city model and the width is conservative. More districts would tighten it; fewer would not make it honest.",
   "intervals_are_calibrated": false,
   "features_used": [
     "canopy_pct",
