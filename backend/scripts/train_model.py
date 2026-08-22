@@ -140,10 +140,35 @@ def _load_tcm_fixtures(fixture_dir: Path) -> dict[str, list[Any]]:
     return dict(by_district)
 
 
+def _prefer_city_scale(
+    by_district: dict[str, list[Any]]
+) -> dict[str, list[Any]]:
+    """Drop a small district capture when its city-scale version exists.
+
+    The small AOIs sit *inside* the city ones -- `phoenix` is 3 sq mi of the
+    45 sq mi `phoenix_city`, captured at the same timestamp. Keeping both would
+    put the same ground in the training set twice, and worse, a grouped holdout
+    treats them as different districts, so `phoenix_city` could train while
+    `phoenix` is held out and the reported score would be measured on ground the
+    model had already seen.
+
+    City scale wins because it is what the model needs: at 3 sq mi the capture
+    sits inside one neighbourhood and the temperature field is a smooth gradient,
+    which a model reads as latitude rather than as land cover.
+    """
+    city_keys = {k for k in by_district if k.endswith("_city")}
+    superseded = {k[: -len("_city")] for k in city_keys}
+    return {
+        key: tiles
+        for key, tiles in by_district.items()
+        if key not in superseded
+    }
+
+
 def readiness(fixture_dir: Path) -> dict[str, Any]:
     """What training would and would not be able to claim, without training."""
     files = _fixture_files(fixture_dir)
-    by_district = _load_tcm_fixtures(fixture_dir)
+    by_district = _prefer_city_scale(_load_tcm_fixtures(fixture_dir))
 
     # Probe the real chain rather than asserting what it contains. The previous
     # hardcoded answer said three features resolved long after nine did, because
@@ -228,7 +253,7 @@ def train(*, allow_thin: bool, model_dir: Path, fixture_dir: Path) -> int:
         print("  No labelled tiles found in any tcm fixture. Nothing to train on.")
         return 1
 
-    by_district = _load_tcm_fixtures(fixture_dir)
+    by_district = _prefer_city_scale(_load_tcm_fixtures(fixture_dir))
     feature_dir = fixture_dir.parent / "features"
 
     rows_by_district: dict[str, list[dict[str, float | None]]] = {}
