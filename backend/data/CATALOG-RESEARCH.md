@@ -34,7 +34,9 @@ not say, and the citation would then be attached to a number that is not in it.
 
 ## 🟡 Cost confirmed, effect not yet
 
-### `cool_roof_membrane`
+### ~~`cool_roof_membrane`~~ — moved into the catalog 2026-08-22, see above
+
+#### Original notes
 
 **Cost — confirmed by reading the source.** EPA, *Reducing Urban Heat Islands:
 Compendium of Strategies*, Chapter 4 (Cool Roofs), Table 2 "Comparison of Traditional
@@ -88,6 +90,70 @@ magnitude between a bus-shelter canopy and an engineered plaza sail, so a single
 cost may not be meaningful without splitting the row.
 
 ---
+
+### `cool_roof_membrane` — in the catalog since 2026-08-22
+
+| Half | Status | Source |
+|---|---|---|
+| Cost | Confirmed, read from the PDF | EPA Compendium Ch. 4, Table 2, p.13 — white single-ply PVC $1.00–2.05/ft² → $10.76–22.06/m², entered as the $16.41 midpoint |
+| Effect | Confirmed with a stated caveat | Brousse et al. 2024, *GRL* 51(13), [doi:10.1029/2024GL109634](https://doi.org/10.1029/2024GL109634) — −1.2 °C average, −2.0 °C peak |
+| Lifespan | Confirmed, conservative end | [Sika, *Durability of PVC Roofing Membranes*](https://can.sika.com/dam/dms/ca01/j/durability-of-pvc-roofing-membranes-study.pdf) — "in excess of 20 to 30 years"; 20 used |
+
+**Caveats carried in the citation**, not hidden:
+
+1. **The effect figures were not read from the paper.** Both the Wiley page and the
+   UCL repository returned HTTP 403 on 2026-08-21, so the numbers come from UCL's
+   own press release about their own paper. Confirm against the paper before
+   publishing.
+2. **It is a modelling study** (WRF BEP-BEM), not a measurement campaign, and it
+   models **city-wide** adoption across Greater London — not one treated block.
+3. **London is temperate maritime; the demo districts are hot deserts.** Insolation
+   is higher here, so the transfer is unvalidated in either direction.
+4. **The cost is a full installed cost.** The same EPA table prices black PVC at
+   $1.00–2.00/ft², so at scheduled roof replacement the *incremental* cost of
+   choosing white is near zero and this row overstates it several-fold.
+5. **Maintenance is 0.00 as a floor, not a measurement.** No recurring figure sourced.
+
+The same EPA table also gives reflectance — black PVC 0.04–0.05 against white PVC
+0.70–0.78 — which is the first citable evidence for the albedo delta the `material`
+counterfactual applies. `ml/counterfactual.py` currently uses an uncited +0.35,
+which is conservative against this source.
+
+---
+
+## ⛔ `shade` and `water` — out of scope, and not for lack of time
+
+Decided 2026-08-22 after sourcing both halves for two rows. **These two categories
+were dropped deliberately, on physical grounds.**
+
+**A CoolRx tile is 100 m × 100 m = 10,000 m². A bus shelter shades about 10 m².**
+
+The cost side was easy — Los Angeles Department of Public Works puts an upgraded
+transit shelter at about **$35,000**, excluding sidewalk and electrical
+([LAist](https://laist.com/news/transportation/boyle-heights-bus-shelter-shade-equity)),
+and other US cities run $5,500–$12,000. The effect side is the problem: a shelter
+changes the **radiant** temperature felt by a person standing under it. It does not
+measurably change **air** temperature averaged over a hectare, which is what the
+model is trained on and what the exceedance ladder converts into hours.
+
+Writing an air-temperature delta for a point intervention would be inventing
+physics — the same category of error as inventing a unit cost, and harder to spot
+because the number would look reasonable.
+
+`water` fails the same way. Published misting effects span **0.2 °C to 17.5 °C**
+depending on nozzle pressure, humidity and canyon geometry; no installed cost is
+available from a primary source; and the intervention is again point-scale.
+
+**What would make these legitimate**, if someone wants them later:
+
+* A tile-scale shade intervention — a plaza-wide canopy or a parking-structure
+  cover — sourced at that scale, *or* the `openness_proxy` feature (sky view
+  factor), which is the correct physics but needs building heights.
+* A tile-scale water body — a retention basin or urban pond — with a published
+  installed cost and a measured air-temperature effect at comparable scale.
+
+Both are real work, not a lookup. Two sourced categories with a stated reason for
+the omission is a stronger position than four rows where two are fabricated.
 
 ## Why the file is not simply filled in
 
