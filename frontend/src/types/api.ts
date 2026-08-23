@@ -3,6 +3,7 @@
  * SRS §17. Mirrors the backend's FastAPI/pydantic schemas.
  */
 
+import type { FgStatsFlat } from './fortyguard';
 import type {
   AgentRun,
   AnalyticRun,
@@ -160,7 +161,7 @@ export interface TilesResponse {
 
 export interface StatsResponse {
   readonly analyticRuns: readonly AnalyticRun[];
-  readonly stats: FgStatsData;
+  readonly stats: FgStatsFlat;
   /** Null until at least one analytic run has values to derive it from. */
   readonly hotspotCutoff: number | null;
   readonly districtMeanC: number | null;

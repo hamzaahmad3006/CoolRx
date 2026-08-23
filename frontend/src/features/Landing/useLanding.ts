@@ -5,6 +5,7 @@ import { useCallback } from 'react';
 
 import { useAppDispatch } from '@/redux/hooks';
 import { setCurrentProject } from '@/redux/slices/sessionSlice';
+import { useListProjectsQuery } from '@/redux/api/coolRxApi';
 import type { IconName } from '@/constants';
 
 /**
@@ -19,9 +20,7 @@ export interface PresetDistrict {
   readonly name: string;
   readonly city: string;
   readonly state: string;
-  readonly peakTempC: number;
-  readonly hoursAboveThreshold: number;
-  readonly population: number;
+  readonly areaSqMi: number;
 }
 
 export interface WorkflowStep {
@@ -29,41 +28,6 @@ export interface WorkflowStep {
   readonly caption: string;
   readonly icon: IconName;
 }
-
-/**
- * The three pre-baked demo districts. These are static by design: their
- * FortyGuard responses are cached and committed as fixtures so the demo loads in
- * under three seconds and costs zero API credits (SRS FR-022).
- */
-const PRESET_DISTRICTS: readonly PresetDistrict[] = [
-  {
-    presetId: 'phoenix-encanto',
-    name: 'Encanto',
-    city: 'Phoenix',
-    state: 'AZ',
-    peakTempC: 44.1,
-    hoursAboveThreshold: 9,
-    population: 12_400,
-  },
-  {
-    presetId: 'la-westlake',
-    name: 'Westlake',
-    city: 'Los Angeles',
-    state: 'CA',
-    peakTempC: 38.2,
-    hoursAboveThreshold: 5,
-    population: 45_100,
-  },
-  {
-    presetId: 'houston-gulfton',
-    name: 'Gulfton',
-    city: 'Houston',
-    state: 'TX',
-    peakTempC: 40.5,
-    hoursAboveThreshold: 7,
-    population: 28_900,
-  },
-] as const;
 
 const WORKFLOW_STEPS: readonly WorkflowStep[] = [
   {
@@ -90,6 +54,8 @@ const WORKFLOW_STEPS: readonly WorkflowStep[] = [
 
 interface UseLandingResult {
   readonly presets: readonly PresetDistrict[];
+  readonly isLoading: boolean;
+  readonly error: string | null;
   readonly workflow: readonly WorkflowStep[];
   readonly openDistrict: (presetId: string) => void;
   readonly openMethods: () => void;
@@ -99,6 +65,32 @@ interface UseLandingResult {
 export function useLanding(): UseLandingResult {
   const router = useRouter();
   const dispatch = useAppDispatch();
+
+  /*
+   * Presets come from the backend, not from a constant here.
+   *
+   * They used to be three hard-coded districts — `phoenix-encanto`,
+   * `la-westlake`, `houston-gulfton` — carrying invented statistics: 44.1 °C,
+   * 12,400 people. No fixture backed them and no measurement produced them, and
+   * clicking one asked the API for a project id it had never issued, which is
+   * where the 422s came from.
+   *
+   * The card now shows only what is known before a diagnosis has run: the
+   * district and its area. Peak temperature, hours above threshold and
+   * population are outputs of the pipeline, and showing them here would mean
+   * inventing them again.
+   */
+  const { data, isLoading, error } = useListProjectsQuery();
+
+  const presets: readonly PresetDistrict[] = (data?.presets ?? []).map(
+    (project) => ({
+      presetId: project.id,
+      name: project.name,
+      city: project.city,
+      state: project.state,
+      areaSqMi: project.areaSqMi,
+    }),
+  );
 
   const openDistrict = useCallback(
     (presetId: string): void => {
@@ -117,7 +109,9 @@ export function useLanding(): UseLandingResult {
   }, [router]);
 
   return {
-    presets: PRESET_DISTRICTS,
+    presets,
+    isLoading,
+    error: error === undefined ? null : 'Districts could not be loaded.',
     workflow: WORKFLOW_STEPS,
     openDistrict,
     openMethods,

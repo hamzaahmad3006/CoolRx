@@ -5,7 +5,13 @@ import { useCallback, useMemo } from 'react';
 import type { IconName } from '@/constants';
 import { useAppDispatch, useAppSelector } from '@/redux/hooks';
 import { selectTile, setActiveAnalytic } from '@/redux/slices/uiSlice';
-import { useGetStatsQuery, useGetTilesQuery } from '@/redux/api/coolRxApi';
+import {
+  useGetPrioritiesQuery,
+  useGetStatsQuery,
+  useGetTilesQuery,
+} from '@/redux/api/coolRxApi';
+import { fgStat, fgStatsBlock } from '@/types/fortyguard';
+import type { FgNormalDistribution } from '@/types/fortyguard';
 import type {
   EstimateUnit,
   FgAnalyticType,
@@ -26,6 +32,15 @@ import {
 } from './diagnosis.fixture';
 
 const USE_FIXTURES = process.env.NEXT_PUBLIC_USE_FIXTURES === 'true';
+
+/**
+ * Equity weighting for the diagnosis ranking.
+ *
+ * The Prescription page owns this as a user-adjustable control; the
+ * diagnosis table shows the balanced ranking so the two views are
+ * comparable before any weighting has been chosen.
+ */
+const DEFAULT_EQUITY_LAMBDA = 0.5;
 
 /**
  * Metadata per analytic layer. Units are declared here and echoed from the API
@@ -108,12 +123,33 @@ interface UseDiagnosisArgs {
   readonly projectId: string;
 }
 
+/**
+ * The four headline statistics, normalised.
+ *
+ * Two shapes reach this hook. The committed fixtures carry the API's raw
+ * `stats_data` blob, with the statistics nested under `temperature_stats`; the
+ * backend's own `/stats` endpoint returns them already flattened to
+ * min/max/mean/std. Both describe the same measurement, so the hook normalises
+ * rather than making every consumer branch on which one it got.
+ *
+ * Every field is nullable. A null renders as an em dash: 0 °C is a reading, and
+ * printing it for an unmeasured district would look arctic rather than absent.
+ */
+export interface DistrictStats {
+  readonly min: number | null;
+  readonly max: number | null;
+  readonly mean: number | null;
+  readonly std: number | null;
+  readonly count: number | null;
+  readonly units: string | null;
+}
+
 interface UseDiagnosisResult {
   readonly activeAnalytic: FgAnalyticType;
   readonly meta: AnalyticMeta;
   readonly tiles: TileCollection | null;
   readonly domain: readonly [number, number];
-  readonly stats: FgStatsData | null;
+  readonly stats: DistrictStats | null;
   readonly priorities: readonly TilePriority[];
   readonly peakHourHistogram: readonly number[];
   readonly districtPeakHourLocal: number;
@@ -141,6 +177,10 @@ export function useDiagnosis({
     { skip: USE_FIXTURES },
   );
   const statsQuery = useGetStatsQuery(projectId, { skip: USE_FIXTURES });
+  const prioritiesQuery = useGetPrioritiesQuery(
+    { projectId, equityLambda: DEFAULT_EQUITY_LAMBDA },
+    { skip: USE_FIXTURES },
+  );
 
   const tiles = useMemo<TileCollection | null>(() => {
     if (USE_FIXTURES) return fixtureTiles(activeAnalytic);
@@ -151,25 +191,69 @@ export function useDiagnosis({
     };
   }, [activeAnalytic, tilesQuery.data]);
 
-  const domain = useMemo<readonly [number, number]>(
-    () => (USE_FIXTURES ? fixtureDomain(activeAnalytic) : [0, 1]),
-    [activeAnalytic],
-  );
-
-  const stats = useMemo<FgStatsData | null>(() => {
-    if (USE_FIXTURES) return fixtureStats(activeAnalytic);
-    return statsQuery.data?.stats ?? null;
+  const stats = useMemo<DistrictStats | null>(() => {
+    if (USE_FIXTURES) {
+      const blob = fixtureStats(activeAnalytic);
+      return {
+        min: fgStat(blob, 'min'),
+        max: fgStat(blob, 'max'),
+        mean: fgStat(blob, 'mean'),
+        std: fgStat(blob, 'std'),
+        count: null,
+        units: null,
+      };
+    }
+    const flat = statsQuery.data?.stats;
+    if (flat === undefined) return null;
+    return {
+      min: flat.min ?? null,
+      max: flat.max ?? null,
+      mean: flat.mean ?? null,
+      std: flat.std ?? null,
+      count: flat.count ?? null,
+      // Echoed from the response, never assumed. The live API sends no units
+      // field for `tcm`, so this is null rather than a guessed "°C".
+      units: flat.units ?? null,
+    };
   }, [activeAnalytic, statsQuery.data]);
 
-  const priorities = useMemo(
-    () => (USE_FIXTURES ? fixturePriorities(12) : []),
-    [],
+  const domain = useMemo<readonly [number, number]>(() => {
+    if (USE_FIXTURES) return fixtureDomain(activeAnalytic);
+    // From the measured range, not a constant. The placeholder [0, 1] left the
+    // legend claiming a district spanned one degree from zero, and every tile
+    // rendered at the top of the colour ramp.
+    const lo = stats?.min;
+    const hi = stats?.max;
+    if (lo === null || lo === undefined || hi === null || hi === undefined) {
+      return [0, 1];
+    }
+    // A district whose tiles are all one value would give a zero-width domain,
+    // which is a divide-by-zero in every colour scale.
+    return hi > lo ? [lo, hi] : [lo, lo + 1];
+  }, [activeAnalytic, stats]);
+
+  const priorities = useMemo<readonly TilePriority[]>(
+    () =>
+      USE_FIXTURES ? fixturePriorities(12) : (prioritiesQuery.data?.items ?? []),
+    [prioritiesQuery.data],
   );
 
-  const peakHourHistogram = useMemo(
-    () => (USE_FIXTURES ? fixturePeakHourHistogram() : []),
-    [],
-  );
+  const peakHourHistogram = useMemo<readonly number[]>(() => {
+    if (USE_FIXTURES) return fixturePeakHourHistogram();
+    // Counted from the ranked blocks rather than fetched: `peakHourLocal` is
+    // already on each one, and a second endpoint for the same numbers could
+    // disagree with the table beside it.
+    const hours = new Array<number>(24).fill(0);
+    let seen = 0;
+    priorities.forEach((tile) => {
+      const hour = tile.peakHourLocal;
+      if (hour !== null && hour !== undefined && hour >= 0 && hour < 24) {
+        hours[hour] = (hours[hour] ?? 0) + 1;
+        seen += 1;
+      }
+    });
+    return seen > 0 ? hours : [];
+  }, [priorities]);
 
   /** Modal peak hour across the district. */
   const districtPeakHourLocal = useMemo(() => {
@@ -185,13 +269,33 @@ export function useDiagnosis({
   }, [peakHourHistogram]);
 
   const distributionPoints = useMemo(() => {
-    if (stats === null) return [];
-    const { x_axis: xs, y_axis: ys } = stats.Normal_temperature_distribution;
+    /*
+     * Only the fixtures carry a distribution.
+     *
+     * `stats_data.normal_temperature_distribution` is in the raw FortyGuard
+     * response, and the backend's `/stats` publishes the four summary
+     * statistics rather than the curve. So on live data this is empty and the
+     * chart renders its own no-data state -- which is the honest outcome, not a
+     * bug to paper over by synthesising a bell curve from mean and standard
+     * deviation. That curve would look like a measurement and would not be one.
+     *
+     * The block is optional and its casing varies even within the fixtures --
+     * the docs capitalise it, the live API does not -- so it is read through
+     * `fgStatsBlock` rather than by property access.
+     */
+    if (!USE_FIXTURES) return [];
+    const distribution = fgStatsBlock<FgNormalDistribution>(
+      fixtureStats(activeAnalytic),
+      'Normal_temperature_distribution',
+    );
+    const xs = distribution?.x_axis;
+    const ys = distribution?.y_axis;
+    if (xs === undefined || ys === undefined) return [];
     return xs.map((temperature, index) => ({
       temperature,
       density: ys[index] ?? 0,
     }));
-  }, [stats]);
+  }, [activeAnalytic]);
 
   const onAnalyticChange = useCallback(
     (analytic: FgAnalyticType): void => {

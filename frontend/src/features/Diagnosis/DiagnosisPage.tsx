@@ -126,22 +126,15 @@ export function DiagnosisPage({
           </div>
         ) : (
           <dl className="grid grid-cols-2 gap-3">
-            <StatCell label="Mean" value={stats.Temperature_stats.Mean} meta={meta} />
-            <StatCell
-              label="Maximum"
-              value={stats.Temperature_stats.Maximum}
-              meta={meta}
-            />
-            <StatCell
-              label="Minimum"
-              value={stats.Temperature_stats.Minimum}
-              meta={meta}
-            />
-            <StatCell
-              label="Std deviation"
-              value={stats.Temperature_stats.Standard_deviation}
-              meta={meta}
-            />
+            {/*
+              Read through `fgStat`, not by property access: the live API
+              lower-cases both the block name and the field names, and reading
+              only the documented spelling produced four undefined cells.
+            */}
+            <StatCell label="Mean" value={stats.mean} meta={meta} />
+            <StatCell label="Maximum" value={stats.max} meta={meta} />
+            <StatCell label="Minimum" value={stats.min} meta={meta} />
+            <StatCell label="Std deviation" value={stats.std} meta={meta} />
           </dl>
         )}
         <p className="mt-3 font-mono text-caption text-ink-muted" data-numeric>
@@ -273,7 +266,7 @@ export function DiagnosisPage({
 
 interface StatCellProps {
   readonly label: string;
-  readonly value: number;
+  readonly value: number | null;
   readonly meta: { readonly unit: 'celsius' | 'hour' | 'count' | 'people' | 'person_hour' | 'usd'; readonly unitLabel: string };
 }
 
@@ -286,10 +279,18 @@ function StatCell({ label, value, meta }: StatCellProps) {
       {/* The space before the unit is a real text node, not just a margin —
           otherwise copy-paste and screen readers get "4hours". */}
       <dd className="font-mono text-body font-medium text-ink" data-numeric>
-        {formatNumber(value, meta.unit)}{' '}
-        <span className="text-caption font-normal text-ink-muted">
-          {meta.unitLabel}
-        </span>
+        {value === null ? (
+          /* Not measured. An em dash rather than a zero: 0 °C is a reading, and
+             printing it here would make an unmeasured block look arctic. */
+          <span className="text-ink-muted">—</span>
+        ) : (
+          <>
+            {formatNumber(value, meta.unit)}{' '}
+            <span className="text-caption font-normal text-ink-muted">
+              {meta.unitLabel}
+            </span>
+          </>
+        )}
       </dd>
     </div>
   );
