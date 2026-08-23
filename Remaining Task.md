@@ -1,14 +1,56 @@
 # CoolRx — Remaining Tasks
 
 Working document. Tasks are ordered by dependency, so doing them top-to-bottom
-avoids writing anything twice. Each is sized to be finishable and verifiable on
-its own.
+avoids writing anything twice.
 
-**Last updated:** 2026-08-18 · **Target:** complete before 24 Aug · **Tests:** 559 collected · **524 passing, 0 failing** ·
-35 need Postgres/Redis (see N-1b)
+**Last updated:** 2026-08-23 · **Target:** core complete 24 Aug, submit by 29 Aug ·
+**Tests:** 739 passing, 0 skipped with Postgres and Redis up
 
-> Commit SHAs changed when history was rewritten for the initial push; see
-> `git log` rather than quoting them here.
+> Everything below the "Status at a glance" table is the older working log, kept
+> for its reasoning. Where it disagrees with this header, this header is right.
+
+---
+
+## What is left — 23 August
+
+Three items are **mandatory for the submission** and none of them can be done
+without you.
+
+| # | Item | Blocked on |
+|---|---|---|
+| 1 | **Live demo URL** | your Railway account — guide at `infra/railway.md` |
+| 2 | **Video, ≤3 min** | recording — script at `docs/DEMO_SCRIPT.md`, numbers verified |
+| 3 | **Submission form** | your submission — text ready at `docs/SUBMISSION.md` |
+| 4 | Add `hackathon@fortyguard.com` as collaborator | your GitHub |
+
+One open technical item:
+
+| # | Item | State |
+|---|---|---|
+| 5 | Verify the trimmed API image imports cleanly | Docker daemon wedged mid-session; image store emptied on restart. Needs a rebuild and one `import rasterio` check. |
+
+### Known limitations, decided rather than outstanding
+
+These are **not** todo items. Each was investigated and closed with a reason;
+they are listed so nobody reopens them by accident.
+
+* **`albedo_proxy` and `openness_proxy` are null.** No citable source. Albedo
+  needs a per-class reflectance table, openness needs building heights. The
+  consequence — a `material` intervention is predicted to do exactly nothing —
+  is published in the model card rather than hidden.
+* **`shade` and `water` are not in the catalog.** A tile is 100 m × 100 m; a bus
+  shelter shades about 10 m². It changes radiant temperature for a person under
+  it, not air temperature over a hectare. Reasoning in
+  `backend/data/CATALOG-RESEARCH.md`.
+* **The model does not transfer across cities** (R² −0.009 held out). Stated on
+  the Methods page and in the PDF.
+* **Intervals are conservative, not calibrated** (93% against a nominal 80%).
+  With two training districts each conformal fold fits on one city, so the width
+  is cautious. More districts would tighten it; relaxing the check would not.
+* **`units` is null for `tcm`.** The live API sends none. Labelling it would be
+  inventing the unit (N-3).
+* **SVI has no source.** The CDC dataset is published as a map asset with no
+  queryable columns, so the equity quartile reports null.
 
 ---
 
