@@ -33,6 +33,7 @@ from clients.fortyguard.client import FortyGuardClient
 from clients.fortyguard.parsing import parse_heatmap, read_stat
 from core.config import Settings
 from geo import (
+    EXPOSURE_FIELDS,
     Tile as GridTile,
     apply_district_mean,
     default_providers,
@@ -196,13 +197,44 @@ def run_diagnose_pipeline(
 
         district_mean = read_stat(tcm.result, "mean")
         apply_district_mean(feature_rows, district_mean)
-        tiles_repo.upsert_features(project_id=project_id, rows=feature_rows)
+
+        # The enriched row carries the model's inputs *and* the census answers,
+        # because both come from the same provider chain. They belong in
+        # different tables: `tile_features` holds what the model trains on, and
+        # `exposure` holds who is affected. Writing the whole row to
+        # `upsert_features` raised KeyError: 'population' against the excluded
+        # columns, because tile_features has no such column and never has.
+        exposure_rows = [
+            {
+                "tile_key": row["tile_key"],
+                **{field: row.get(field) for field in EXPOSURE_FIELDS},
+            }
+            for row in feature_rows
+        ]
+        model_rows = [
+            {k: v for k, v in row.items() if k not in EXPOSURE_FIELDS}
+            for row in feature_rows
+        ]
+        tiles_repo.upsert_features(project_id=project_id, rows=model_rows)
 
         # ── Exposure ─────────────────────────────────────────────────────────
         jobs.advance(job_id, stage="computing_exposure", progress_pct=75)
-        # Census joins live behind the same provider contract; until they are
-        # wired the exposure table stays empty rather than carrying invented
-        # populations, and the priority ranking falls back to raw hours.
+        # Populated from the census providers rather than left empty. A tile with
+        # no census answer keeps a null population, which the priority ranking
+        # already handles by falling back to raw hours -- an invented population
+        # would silently reweight the whole plan.
+        written = tiles_repo.upsert_exposure(
+            project_id=project_id, rows=exposure_rows
+        )
+        with_population = sum(
+            1 for row in exposure_rows if row.get("population") is not None
+        )
+        log.info(
+            "pipeline.exposure_written",
+            rows=written,
+            with_population=with_population,
+            tiles=len(exposure_rows),
+        )
 
         # ── Attribution ──────────────────────────────────────────────────────
         jobs.advance(job_id, stage="attributing", progress_pct=90)

@@ -218,9 +218,14 @@ REQUIRED_FEATURE_FIELDS: Final[tuple[str, ...]] = (
 #:
 #: Population and equity attributes answer "who is exposed", not "how hot is this
 #: tile", so feeding them to a temperature model would be a leak. They are still
-#: per-tile columns -- tile_features has held them since the initial schema --
-#: because the exposure and equity views multiply a temperature change by the
-#: people it affects, which is the step that turns degrees into person-heat-hours.
+#: per-tile values, because the exposure and equity views multiply a temperature
+#: change by the people it affects, which is the step that turns degrees into
+#: person-heat-hours.
+#:
+#: They live in the `exposure` table, NOT in `tile_features`. Enrichment produces
+#: one row carrying both, and the pipeline splits it before writing: the model's
+#: inputs go to tile_features, these go to exposure. Handing the whole row to
+#: `upsert_features` raises KeyError: 'population' against the excluded columns.
 #:
 #: Split out from REQUIRED_FEATURE_FIELDS rather than added to it: on 2026-08-21
 #: the census providers answered 144/144 tiles at full coverage and enrich_tiles
