@@ -18,6 +18,7 @@ import structlog
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from clients.fortyguard.parsing import read_stat
 from repositories.tables import AnalyticRun, FgRequest
 from repositories.tiles import TileRepository
 from schemas.analytics import (
@@ -96,7 +97,7 @@ class AnalyticsController:
         # falling back to the newest run keeps the endpoint usable when only an
         # exceedance run exists.
         primary = next((r for r in runs if r.analytic_type == "tcm"), runs[0])
-        stats = FgStats.model_validate(primary.stats or {})
+        stats = self._stats_of(primary)
 
         return StatsResponse(
             analytic_runs=[
@@ -106,6 +107,39 @@ class AnalyticsController:
             stats=stats,
             hotspot_cutoff=self._hotspot_cutoff(stats),
             district_mean_c=stats.mean,
+        )
+
+    def _stats_of(self, run: AnalyticRun) -> FgStats:
+        """The run's statistics, read through the same helper the pipeline uses.
+
+        `FgStats` is flat -- min, max, mean, std -- and the API is not. The real
+        response nests them under `stats_data.temperature_stats` and names them
+        `minimum`, `maximum`, `standard_deviation`. Validating the stored blob
+        straight into the flat model therefore matched nothing and returned all
+        nulls, so `/stats` published an empty statistics block for every project
+        and the map legend had no domain to scale to. Nothing errored: every
+        field is legitimately optional, because the contents genuinely vary by
+        analytic type.
+
+        `read_stat` already knew the shape -- it handles the documented
+        capitalisation and the lower-cased spelling the live API actually sends.
+        It expects the whole result, so the stored `stats_data` is rewrapped.
+
+        `median` is not published by the API and stays null rather than being
+        approximated from the mean.
+        """
+        raw = {"stats_data": run.stats or {}}
+        with_values, _total = self._tiles.coverage(run.id)
+        return FgStats(
+            min=read_stat(raw, "min"),
+            max=read_stat(raw, "max"),
+            mean=read_stat(raw, "mean"),
+            median=None,
+            std=read_stat(raw, "std"),
+            count=with_values,
+            # Echoed from the run, never assumed. The live API sends no units
+            # field, so this is null rather than a guessed "celsius" (N-3).
+            units=run.units,
         )
 
     @staticmethod

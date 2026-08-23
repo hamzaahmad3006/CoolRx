@@ -20,7 +20,8 @@ import { useMethods } from './useMethods';
  * overconfident by the same margin.
  */
 export function MethodsPage() {
-  const { validation, coverageIsHealthy, coverageTarget } = useMethods();
+  const { validation, coverageIsHealthy, coverageState, coverageTarget } =
+    useMethods();
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-5 p-6">
@@ -80,67 +81,86 @@ export function MethodsPage() {
       </Card>
 
       {/* ── Model card ──────────────────────────────────────────────────── */}
-      <Card eyebrow="Model" title={validation.modelVersion}>
-        <div className="flex flex-col gap-4">
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
-            <dt className="text-ink-secondary">Training blocks</dt>
-            <dd className="text-right tabular-nums text-ink-primary" data-numeric>
-              {formatNumber(validation.trainingTileCount, 'count')}
-            </dd>
+      {validation === null ? (
+        <Card eyebrow="Model" title="Model metrics unavailable">
+          <p className="text-sm text-ink-secondary">
+            The published metrics could not be loaded, so nothing is shown here.
+            This page states what the model can and cannot do; printing another
+            model&rsquo;s figures in place of the missing ones would defeat its
+            purpose entirely.
+          </p>
+        </Card>
+      ) : (
+        <Card eyebrow="Model" title={validation.modelVersion}>
+          <div className="flex flex-col gap-4">
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+              <dt className="text-ink-secondary">Training blocks</dt>
+              <dd className="text-right tabular-nums text-ink-primary" data-numeric>
+                {formatNumber(validation.trainingTileCount, 'count')}
+              </dd>
 
-            <dt className="text-ink-secondary">Mean absolute error</dt>
-            <dd className="text-right tabular-nums text-ink-primary" data-numeric>
-              {validation.maeC.toFixed(2)} °C
-            </dd>
+              <dt className="text-ink-secondary">Mean absolute error</dt>
+              <dd className="text-right tabular-nums text-ink-primary" data-numeric>
+                {validation.maeC.toFixed(2)} °C
+              </dd>
 
-            <dt className="text-ink-secondary">R²</dt>
-            <dd className="text-right tabular-nums text-ink-primary" data-numeric>
-              {validation.r2.toFixed(2)}
-            </dd>
+              <dt className="text-ink-secondary">R²</dt>
+              <dd className="text-right tabular-nums text-ink-primary" data-numeric>
+                {validation.r2.toFixed(2)}
+              </dd>
 
-            <dt className="text-ink-secondary">Features used</dt>
-            <dd className="text-right tabular-nums text-ink-primary" data-numeric>
-              {validation.features.length}
-            </dd>
-          </dl>
+              <dt className="text-ink-secondary">Features used</dt>
+              <dd className="text-right tabular-nums text-ink-primary" data-numeric>
+                {validation.features.length}
+              </dd>
+            </dl>
 
-          {/* The number that decides whether every other interval is believable. */}
-          <div
-            className={
-              coverageIsHealthy
-                ? 'rounded-sharp border border-verified-line bg-verified-bg px-3 py-2'
-                : 'rounded-sharp border border-caution-line bg-caution-bg px-3 py-2'
-            }
-          >
-            <div className="flex items-baseline justify-between">
-              <span className="text-xs font-medium text-ink-primary">
-                Interval coverage
-              </span>
-              <span className="font-mono text-sm text-ink-primary" data-numeric>
-                {(validation.intervalCoverage * 100).toFixed(0)}%
-              </span>
+            {/* The number that decides whether every other interval is believable. */}
+            <div
+              className={
+                coverageIsHealthy
+                  ? 'rounded-sharp border border-verified-line bg-verified-bg px-3 py-2'
+                  : 'rounded-sharp border border-caution-line bg-caution-bg px-3 py-2'
+              }
+            >
+              <div className="flex items-baseline justify-between">
+                <span className="text-xs font-medium text-ink-primary">
+                  Interval coverage
+                </span>
+                <span className="font-mono text-sm text-ink-primary" data-numeric>
+                  {(validation.intervalCoverage * 100).toFixed(0)}%
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-ink-secondary">
+                {/*
+                  The measured figure, never the target. This branch used to print
+                  "About 80% ... which is what a well-calibrated interval should
+                  do" directly beneath a measured 93%, which was a false
+                  reassurance contradicting the number above it.
+                */}
+                {coverageState === 'calibrated'
+                  ? `${(validation.intervalCoverage * 100).toFixed(0)}% of held-out blocks fell inside the model's stated range, against the ${(coverageTarget * 100).toFixed(0)}% a calibrated interval should produce. The ranges shown across the site can be read as intended.`
+                  : coverageState === 'conservative'
+                    ? `${(validation.intervalCoverage * 100).toFixed(0)}% of held-out blocks fell inside the stated range, more than the ${(coverageTarget * 100).toFixed(0)}% a calibrated interval should produce. The ranges are wider than the model's own error warrants — cautious rather than overconfident, but not calibrated.`
+                    : `Only ${(validation.intervalCoverage * 100).toFixed(0)}% of held-out blocks fell inside the stated range, against the ${(coverageTarget * 100).toFixed(0)}% a calibrated model should produce. The intervals shown across the site are narrower than the real uncertainty — treat every range as optimistic.`}
+              </p>
             </div>
-            <p className="mt-1 text-xs text-ink-secondary">
-              {coverageIsHealthy
-                ? `About ${(coverageTarget * 100).toFixed(0)}% of held-out blocks fell inside the model's stated range, which is what a well-calibrated interval should do. The ranges shown across the site can be read as intended.`
-                : `Fewer held-out blocks fell inside the stated range than the ${(coverageTarget * 100).toFixed(0)}% a calibrated model should produce. The intervals shown across the site are narrower than the real uncertainty — treat every range as optimistic.`}
-            </p>
-          </div>
 
-          <div className="flex flex-col gap-1.5">
-            <span className="text-xs text-ink-secondary">Trained on</span>
-            <p className="text-sm text-ink-primary">
-              {validation.trainingDistricts.join(', ')}
-            </p>
-            <span className="mt-1 text-xs text-ink-secondary">
-              Held out for testing
-            </span>
-            <p className="text-sm text-ink-primary">
-              {validation.heldOutDistricts.join(', ')}
-            </p>
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs text-ink-secondary">Trained on</span>
+              <p className="text-sm text-ink-primary">
+                {validation.trainingDistricts.join(', ')}
+              </p>
+              <span className="mt-1 text-xs text-ink-secondary">
+                Held out for testing
+              </span>
+              <p className="text-sm text-ink-primary">
+                {validation.heldOutDistricts.join(', ')}
+              </p>
+            </div>
           </div>
-        </div>
-      </Card>
+        </Card>
+      )}
 
       {/* ── Limitations ─────────────────────────────────────────────────── */}
       {/* Two lists, deliberately. The methodology caveats hold for any version of
@@ -155,30 +175,34 @@ export function MethodsPage() {
         </ul>
       </Card>
 
-      <Card
-        eyebrow="Limitations"
-        title={`Specific to ${validation.modelVersion}`}
-      >
-        <ul className="flex flex-col gap-2.5">
-          {validation.limitations.map((limitation) => (
-            <Limitation key={limitation} text={limitation} />
-          ))}
-        </ul>
-      </Card>
+      {validation !== null && (
+        <>
+        <Card
+          eyebrow="Limitations"
+          title={`Specific to ${validation.modelVersion}`}
+        >
+          <ul className="flex flex-col gap-2.5">
+            {validation.limitations.map((limitation) => (
+              <Limitation key={limitation} text={limitation} />
+            ))}
+          </ul>
+        </Card>
 
-      {/* ── Inputs ──────────────────────────────────────────────────────── */}
-      <Card eyebrow="Inputs" title="Model features">
-        <ul className="flex flex-wrap gap-1.5">
-          {validation.features.map((feature) => (
-            <li
-              key={feature}
-              className="rounded-sharp border border-line bg-subtle px-2 py-0.5 font-mono text-xs text-ink-secondary"
-            >
-              {feature}
-            </li>
-          ))}
-        </ul>
-      </Card>
+        {/* ── Inputs ──────────────────────────────────────────────────────── */}
+        <Card eyebrow="Inputs" title="Model features">
+          <ul className="flex flex-wrap gap-1.5">
+            {validation.features.map((feature) => (
+              <li
+                key={feature}
+                className="rounded-sharp border border-line bg-subtle px-2 py-0.5 font-mono text-xs text-ink-secondary"
+              >
+                {feature}
+              </li>
+            ))}
+          </ul>
+        </Card>
+        </>
+      )}
     </div>
   );
 }

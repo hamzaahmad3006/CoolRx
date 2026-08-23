@@ -132,21 +132,18 @@ export function LandingPage() {
                   />
                 </div>
 
+                {/*
+                  Area only. Peak temperature, hours above threshold and
+                  population are outputs of a diagnosis run — printing them on
+                  the card before one has run would mean inventing them, which
+                  is exactly what the previous hard-coded presets did.
+                */}
                 <dl className="grid grid-cols-2 gap-3">
                   <Stat
-                    label="Peak temp"
-                    value={`${preset.peakTempC.toFixed(1)} °C`}
+                    label="Area"
+                    value={`${preset.areaSqMi.toFixed(1)} sq mi`}
                   />
-                  <Stat
-                    label="Hours > 35 °C"
-                    value={String(preset.hoursAboveThreshold)}
-                  />
-                  <div className="col-span-2">
-                    <Stat
-                      label="Population"
-                      value={preset.population.toLocaleString('en-US')}
-                    />
-                  </div>
+                  <Stat label="Status" value="Ready to diagnose" />
                 </dl>
               </button>
             ))}

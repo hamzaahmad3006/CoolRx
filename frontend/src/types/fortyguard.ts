@@ -86,11 +86,19 @@ export interface FgTileProperties {
  * Statistics block (`result.stats_data`)
  * ────────────────────────────────────────────────────────────────────────────*/
 
+/**
+ * The documented spelling. The live API sends the same four values lower-cased,
+ * so read them through `fgStat` rather than by property access.
+ */
 export interface FgTemperatureStats {
-  readonly Minimum: number;
-  readonly Maximum: number;
-  readonly Mean: number;
-  readonly Standard_deviation: number;
+  readonly Minimum?: number;
+  readonly Maximum?: number;
+  readonly Mean?: number;
+  readonly Standard_deviation?: number;
+  readonly minimum?: number;
+  readonly maximum?: number;
+  readonly mean?: number;
+  readonly standard_deviation?: number;
 }
 
 export interface FgNormalDistribution {
@@ -98,13 +106,48 @@ export interface FgNormalDistribution {
   readonly y_axis: readonly number[];
 }
 
+/**
+ * The API's `stats_data` block.
+ *
+ * Every field is optional and every field may arrive under either casing. The
+ * documentation capitalises these keys; the live API sends them lower-cased —
+ * `normal_temperature_distribution`, `temperature_stats`. Reading only the
+ * documented spelling made the diagnosis page throw
+ * "Cannot destructure property 'x_axis' of 'stats.Normal_temperature_distribution'"
+ * the first time it was pointed at the real backend.
+ *
+ * The contents also genuinely vary by analytic type — an exceedance response has
+ * no temperature distribution — so a missing block is normal rather than an
+ * error. Read these through `fgStatsBlock`, which handles both.
+ */
 export interface FgStatsData {
-  readonly Temperature_stats: FgTemperatureStats;
-  readonly Overall_temperature_distribution: readonly number[];
-  readonly Normal_temperature_distribution: FgNormalDistribution;
+  readonly Temperature_stats?: FgTemperatureStats;
+  readonly temperature_stats?: FgTemperatureStats;
+  readonly Overall_temperature_distribution?: readonly number[];
+  readonly overall_temperature_distribution?: readonly number[];
+  readonly Normal_temperature_distribution?: FgNormalDistribution;
+  readonly normal_temperature_distribution?: FgNormalDistribution;
   /** Histogram-style frequency counts, keyed by bin label. */
-  readonly Temperature_frequency: Readonly<Record<string, number>>;
+  readonly Temperature_frequency?: Readonly<Record<string, number>>;
+  readonly temperature_frequency?: Readonly<Record<string, number>>;
   readonly units?: FgUnits;
+}
+
+/**
+ * One block from `stats_data`, under whichever casing it arrived in.
+ *
+ * Mirrors `read_stat` on the backend, which solved the same mismatch. Returns
+ * null rather than throwing: an analytic type that omits a block is a normal
+ * response, not a failure.
+ */
+export function fgStatsBlock<T>(
+  stats: FgStatsData | null | undefined,
+  key: string,
+): T | null {
+  if (stats === null || stats === undefined) return null;
+  const record = stats as unknown as Record<string, unknown>;
+  const value = record[key] ?? record[key.toLowerCase()];
+  return (value ?? null) as T | null;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -225,3 +268,57 @@ export type FgEnvParamsStatus = FgStatusEnvelope<FgEnvParamsResult>;
  * Treated as missing, never as zero.
  */
 export const FG_LEGACY_MISSING = -999;
+
+
+/** Shorthand → the documented key, matching the backend's STAT_NAMES. */
+const STAT_KEYS: Readonly<Record<string, string>> = {
+  min: 'Minimum',
+  max: 'Maximum',
+  mean: 'Mean',
+  std: 'Standard_deviation',
+};
+
+/**
+ * One statistic from `stats_data`, under whichever casing it arrived in.
+ *
+ * The exact counterpart of `read_stat` in `clients/fortyguard/parsing.py`: the
+ * block may be `Temperature_stats` or `temperature_stats`, and the field may be
+ * `Maximum` or `maximum`. Both spellings name the same measurement, so reading
+ * either is not a guess.
+ *
+ * Returns null when absent. Null renders as an explicit no-data cell; zero would
+ * render as a measurement, and a mean of 0 °C would make every tile look
+ * extraordinarily hot.
+ */
+export function fgStat(
+  stats: FgStatsData | null | undefined,
+  name: 'min' | 'max' | 'mean' | 'std',
+): number | null {
+  const block = fgStatsBlock<Record<string, unknown>>(stats, 'Temperature_stats');
+  if (block === null) return null;
+  const documented = STAT_KEYS[name] ?? name;
+  const raw = block[documented] ?? block[documented.toLowerCase()];
+  return typeof raw === 'number' && Number.isFinite(raw) ? raw : null;
+}
+
+
+/**
+ * The backend's flattened statistics block, as `/stats` returns it.
+ *
+ * Distinct from `FgStatsData`, which is the API's raw `stats_data` and is what
+ * the committed fixtures carry. The backend reads the raw blob through
+ * `read_stat` and publishes this; both describe the same measurement.
+ *
+ * Every field is nullable, and that is load-bearing rather than defensive: the
+ * live API sends no `units` for `tcm`, so a non-null default here would be a
+ * fabricated unit label on every temperature in the product.
+ */
+export interface FgStatsFlat {
+  readonly min: number | null;
+  readonly max: number | null;
+  readonly mean: number | null;
+  readonly median: number | null;
+  readonly std: number | null;
+  readonly count: number | null;
+  readonly units: string | null;
+}
