@@ -1,5 +1,6 @@
 'use client';
 
+import { USE_FIXTURES } from '@/constants';
 import { useCallback, useEffect, useMemo } from 'react';
 
 import { useGetAttributionQuery, useGetExposureQuery } from '@/redux/api/coolRxApi';
@@ -13,7 +14,6 @@ import {
   TILE_FEATURES_FIXTURE,
 } from './attribution.fixture';
 
-const USE_FIXTURES = process.env.NEXT_PUBLIC_USE_FIXTURES !== 'false';
 
 interface UseAttributionDrawerArgs {
   readonly projectId: string;

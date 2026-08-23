@@ -1,13 +1,13 @@
 'use client';
 
 import { useMemo } from 'react';
+import { USE_FIXTURES } from '@/constants';
 
 import { useGetModelValidationQuery } from '@/redux/api/coolRxApi';
 import type { ModelValidation } from '@/types';
 
 import { MODEL_VALIDATION_FIXTURE } from '@/features/AgentTrace/agentTrace.fixture';
 
-const USE_FIXTURES = process.env.NEXT_PUBLIC_USE_FIXTURES !== 'false';
 
 /**
  * A calibrated p10–p90 interval should contain about 80% of held-out

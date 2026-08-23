@@ -1,6 +1,7 @@
 'use client';
 
 import { formatHours, formatNumber, formatPercentScaled } from '@/lib/format';
+import { useDistrictLabel } from '@/features/shared/useDistrictLabel';
 import { AppShell } from '@/components/layout/AppShell';
 import { DeltaHistogram } from '@/components/charts/DeltaHistogram';
 import { MapLegend } from '@/components/map/MapLegend';
@@ -13,9 +14,8 @@ import { useBeforeAfter } from './useBeforeAfter';
 
 interface BeforeAfterPageProps {
   readonly projectId: string;
-  readonly planId: string;
-  readonly districtName: string;
-  readonly districtContext: string;
+  /** Null when no `?plan=` was given; falls back to the session's plan. */
+  readonly planId: string | null;
 }
 
 /**
@@ -28,9 +28,9 @@ interface BeforeAfterPageProps {
 export function BeforeAfterPage({
   projectId,
   planId,
-  districtName,
-  districtContext,
 }: BeforeAfterPageProps) {
+  const { districtName, districtContext } = useDistrictLabel(projectId);
+
   const {
     before,
     after,
@@ -108,7 +108,13 @@ export function BeforeAfterPage({
               detail={`Across ${formatNumber(treatedTileCount, 'count')} treated blocks`}
               onShowProvenance={() => undefined}
             >
-              <Estimate estimate={meanDelta} size="hero" />
+              {/* Null until the plan loads. An em dash rather than a zero:
+                  "0.0 °C of cooling" is a result, and this is its absence. */}
+              {meanDelta === null ? (
+                <span className="text-ink-muted">—</span>
+              ) : (
+                <Estimate estimate={meanDelta} size="hero" />
+              )}
             </StatTile>
 
             <StatTile
@@ -116,7 +122,7 @@ export function BeforeAfterPage({
               icon="exceedance"
               onShowProvenance={() => undefined}
             >
-              {formatHours(heatHoursAvoided)}
+              {heatHoursAvoided === null ? '—' : formatHours(heatHoursAvoided)}
             </StatTile>
 
             <StatTile
@@ -125,7 +131,9 @@ export function BeforeAfterPage({
               detail="People multiplied by dangerous hours avoided"
               onShowProvenance={() => undefined}
             >
-              {formatNumber(personHeatHoursAvoided, 'person_hour')}
+              {personHeatHoursAvoided === null
+                ? '—'
+                : formatNumber(personHeatHoursAvoided, 'person_hour')}
             </StatTile>
 
             <StatTile
@@ -138,7 +146,9 @@ export function BeforeAfterPage({
               }
               onShowProvenance={() => undefined}
             >
-              {formatNumber(peopleReached, 'people')}
+              {peopleReached === null
+                ? '—'
+                : formatNumber(peopleReached, 'people')}
             </StatTile>
 
             <div className="flex flex-col gap-2 rounded-sharp border border-line bg-card p-5">

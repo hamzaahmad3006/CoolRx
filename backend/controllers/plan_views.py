@@ -21,6 +21,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from clients.fortyguard.parsing import read_stat
 from ml.counterfactual import apply_transform, transform_for_category
 from ml.model import ModelNotTrained, OutOfSupport, TemperatureModel
 from repositories.plans import PlanRepository
@@ -93,9 +94,27 @@ class PlanViewsController:
     def counterfactual(self, plan_id: uuid.UUID) -> CounterfactualResponse:
         """The predicted post-intervention field.
 
-        Both sides of the swipe are drawn on one colour scale, returned here
-        rather than computed per side: two independently-scaled halves would make
-        a modest cooling look dramatic.
+        Measured baseline **plus the plan item's predicted cooling**, not a fresh
+        model prediction of the treated tile.
+
+        The distinction is the whole difference between showing an intervention
+        and showing model error. A model prediction of a treated tile differs
+        from the measurement by two things at once: the effect of the treatment,
+        and however wrong the model is about that tile. Differencing it against
+        the measured field mixes the two, and on 2026-08-22 that produced a
+        "predicted change" histogram that was mostly *positive* -- the swipe
+        appeared to show the interventions making the district warmer, when what
+        it actually showed was residual error swamping a tenth of a degree of
+        cooling.
+
+        `predicted_delta_c` carries none of that. It was computed during
+        optimisation and clamped to the catalog's published range, so it is the
+        cooling the plan actually claims, bounded by the citation it rests on.
+        Adding it to the measurement answers the question the swipe asks: what
+        does this street become if we build this.
+
+        Both sides share one colour scale, computed across both fields. Two
+        independently-scaled halves would make a tenth of a degree look dramatic.
         """
         plan = self._plan_or_404(plan_id)
         items = self._plans.items(plan_id)
@@ -106,63 +125,46 @@ class PlanViewsController:
                 f"nothing to compare against.",
             )
 
-        try:
-            model = TemperatureModel.load(self._model_dir())
-        except (ModelNotTrained, FileNotFoundError) as exc:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=f"No trained model available: {exc}",
-            ) from exc
-
-        catalog = self._catalog.by_code()
-        features = self._features_by_tile(plan.project_id)
-
         run = self._latest_tcm_run(plan.project_id)
         if run is None:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="No baseline temperature run for this project.",
             )
+
         geojson = {
             str(item["id"]): item
             for item in self._tiles.tile_geojson_for_run(run.id)
         }
 
         out: list[TileFeatureSchema] = []
-        refused: list[str] = []
-        values: list[float] = []
+        unmeasured: list[str] = []
+        after_values: list[float] = []
+        before_values: list[float] = []
+
+        for shape in geojson.values():
+            value = (shape["properties"] or {}).get("value")
+            if value is not None:
+                before_values.append(float(value))
 
         for item in items:
-            row = features.get(item.tile_key)
             shape = geojson.get(item.tile_key)
-            if row is None or shape is None:
+            if shape is None:
+                unmeasured.append(item.tile_key)
                 continue
 
-            entry = catalog.get(item.intervention_code)
-            if entry is None:
+            measured = (shape["properties"] or {}).get("value")
+            if measured is None:
+                # Treated, but never measured. Named rather than dropped: a gap
+                # in the after-map needs a reason.
+                unmeasured.append(item.tile_key)
                 continue
 
-            vector = {k: (float(v) if v is not None else None) for k, v in row.items()}
-            try:
-                transform = transform_for_category(entry.category)
-                modified = apply_transform(vector, transform)
-                prediction = model.predict(modified)
-            except OutOfSupport:
-                # Named, not omitted. A gap in the after-map needs a reason.
-                refused.append(item.tile_key)
-                continue
-            except Exception as exc:  # noqa: BLE001
-                log.warning(
-                    "counterfactual.tile_failed",
-                    tile_key=item.tile_key,
-                    detail=str(exc),
-                )
-                refused.append(item.tile_key)
-                continue
+            predicted_c = float(measured) + float(item.predicted_delta_c)
+            after_values.append(predicted_c)
 
-            values.append(prediction.value)
             properties = dict(shape["properties"])
-            properties["value"] = round(prediction.value, 3)
+            properties["value"] = round(predicted_c, 3)
             out.append(
                 TileFeatureSchema(
                     id=item.tile_key,
@@ -171,20 +173,21 @@ class PlanViewsController:
                 )
             )
 
-        if not values:
+        if not after_values:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=(
-                    "Every treated tile fell outside the model's training "
-                    "support, so no counterfactual field could be produced."
+                    "No treated tile carries a baseline measurement, so no "
+                    "predicted field could be produced."
                 ),
             )
 
+        combined = before_values + after_values
         return CounterfactualResponse(
             features=out,
-            scale_domain=(min(values), max(values)),
+            scale_domain=(min(combined), max(combined)),
             units=run.units,
-            out_of_support_tile_keys=refused,
+            out_of_support_tile_keys=unmeasured,
         )
 
     def _model_dir(self):

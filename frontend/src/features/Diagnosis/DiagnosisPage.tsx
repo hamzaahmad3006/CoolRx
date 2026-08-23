@@ -1,6 +1,7 @@
 'use client';
 
 import { ERROR_COPY, GLOSSARY } from '@/constants';
+import { useDistrictLabel } from '@/features/shared/useDistrictLabel';
 import {
   formatHourOfDayMaybe,
   formatNumber,
@@ -23,8 +24,6 @@ import { ANALYTIC_OPTIONS, useDiagnosis } from './useDiagnosis';
 
 interface DiagnosisPageProps {
   readonly projectId: string;
-  readonly districtName: string;
-  readonly districtContext: string;
 }
 
 /**
@@ -39,9 +38,9 @@ interface DiagnosisPageProps {
  */
 export function DiagnosisPage({
   projectId,
-  districtName,
-  districtContext,
 }: DiagnosisPageProps) {
+  const { districtName, districtContext } = useDistrictLabel(projectId);
+
   const {
     activeAnalytic,
     meta,

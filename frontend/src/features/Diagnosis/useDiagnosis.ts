@@ -1,5 +1,6 @@
 'use client';
 
+import { USE_FIXTURES } from '@/constants';
 import { useCallback, useMemo } from 'react';
 
 import type { IconName } from '@/constants';
@@ -31,7 +32,6 @@ import {
   fixtureTiles,
 } from './diagnosis.fixture';
 
-const USE_FIXTURES = process.env.NEXT_PUBLIC_USE_FIXTURES === 'true';
 
 /**
  * Equity weighting for the diagnosis ranking.

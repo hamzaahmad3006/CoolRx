@@ -11,8 +11,6 @@ export default async function Page({ params }: PageProps) {
   return (
     <DiagnosisPage
       projectId={projectId}
-      districtName="Phoenix · Encanto"
-      districtContext="2025-07-15 15:00 · 80 m · 35 °C"
     />
   );
 }

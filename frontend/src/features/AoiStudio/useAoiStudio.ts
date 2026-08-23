@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { FG_LIMITS } from '@/constants';
+import { FG_LIMITS, USE_FIXTURES } from '@/constants';
 import {
   areaSqMi,
   boxAround,
@@ -30,7 +30,6 @@ import {
 } from '@/redux/slices/sessionSlice';
 import type { FgGranularity } from '@/types';
 
-const USE_FIXTURES = process.env.NEXT_PUBLIC_USE_FIXTURES !== 'false';
 
 /** Downtown Phoenix — the SRS's primary demo district. */
 const DEFAULT_CENTER: readonly [number, number] = [-112.074, 33.448];

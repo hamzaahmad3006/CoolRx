@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo } from 'react';
 
-import { INTERVENTION_COLORS, type InterventionCategory } from '@/constants';
+import { INTERVENTION_COLORS, type InterventionCategory, USE_FIXTURES } from '@/constants';
 import { useAppDispatch, useAppSelector } from '@/redux/hooks';
 import {
   setBudgetUsd,
@@ -10,7 +10,12 @@ import {
   setObjective,
 } from '@/redux/slices/planControlsSlice';
 import { setCurrentPlan } from '@/redux/slices/sessionSlice';
-import { useCreatePlanMutation, useGetPlanQuery } from '@/redux/api/coolRxApi';
+import {
+  useCreatePlanMutation,
+  useGetJobQuery,
+  useGetPlanQuery,
+  useListPlansQuery,
+} from '@/redux/api/coolRxApi';
 import type { Plan, PlanObjective } from '@/types';
 import type { SegmentOption } from '@/components/ui/SegmentedControl';
 import { PRESCRIPTION_FIXTURE } from './prescription.fixture';
@@ -23,7 +28,6 @@ import { PRESCRIPTION_FIXTURE } from './prescription.fixture';
  * reachable, the committed fixture when running in fixture mode (SRS FR-022).
  */
 
-const USE_FIXTURES = process.env.NEXT_PUBLIC_USE_FIXTURES === 'true';
 
 export const OBJECTIVE_OPTIONS: readonly SegmentOption<PlanObjective>[] = [
   {
@@ -93,12 +97,41 @@ export function usePrescription({
     skip: USE_FIXTURES || planId === null,
   });
 
+  /*
+   * Optimising is a background job, not a synchronous call.
+   *
+   * The POST answers 202 with a job envelope. The response type said `Plan`, so
+   * the client believed the optimiser had returned a finished plan and never
+   * looked again -- the page sat on "No plan yet" while the worker completed the
+   * job perfectly and wrote the plan to the database.
+   *
+   * So: poll the job, and when it reaches a terminal state read the project's
+   * plans and take the newest. `degraded` counts as finished — a plan whose
+   * narration failed still has every number in it, and refusing to show it would
+   * withhold a complete result because its prose is missing.
+   */
+  const jobId = createState.data?.jobId ?? null;
+  const jobQuery = useGetJobQuery(jobId ?? '', {
+    skip: USE_FIXTURES || jobId === null,
+    pollingInterval: 1500,
+  });
+  const jobStatus = jobQuery.data?.status ?? null;
+  // `degraded` is a terminal state alongside `completed`, not a flag on it: a
+  // plan whose narration failed still carries every number, and withholding it
+  // would hide a complete result because its prose is missing.
+  const jobFinished = jobStatus === 'completed' || jobStatus === 'degraded';
+
+  const plansQuery = useListPlansQuery(projectId, {
+    skip: USE_FIXTURES || !jobFinished,
+  });
+
   const plan: Plan | null = useMemo(() => {
     if (USE_FIXTURES) return PRESCRIPTION_FIXTURE;
-    if (createState.data !== undefined) return createState.data;
     if (planQuery.data !== undefined) return planQuery.data;
+    const plans = plansQuery.data?.plans;
+    if (plans !== undefined && plans.length > 0) return plans[0] ?? null;
     return null;
-  }, [createState.data, planQuery.data]);
+  }, [planQuery.data, plansQuery.data]);
 
   /**
    * Publish the plan id to session state.
@@ -155,7 +188,11 @@ export function usePrescription({
   return {
     plan,
     isLoading: planQuery.isLoading,
-    isOptimizing: createState.isLoading,
+    // The button must stay busy for the whole job, not just the POST.
+    // Reporting it done when the request returned would let a second click
+    // queue a duplicate optimisation of the same project.
+    isOptimizing:
+      createState.isLoading || (jobId !== null && !jobFinished),
     errorMessage,
     budgetUsd,
     objective,

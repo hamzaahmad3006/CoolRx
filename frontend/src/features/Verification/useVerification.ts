@@ -1,5 +1,6 @@
 'use client';
 
+import { USE_FIXTURES } from '@/constants';
 import { useCallback, useMemo, useState } from 'react';
 
 import {
@@ -10,7 +11,6 @@ import type { VerificationProtocol, VerificationResult } from '@/types';
 
 import { PROTOCOL_FIXTURE, RESULT_FIXTURE } from './verification.fixture';
 
-const USE_FIXTURES = process.env.NEXT_PUBLIC_USE_FIXTURES !== 'false';
 
 interface UseVerificationArgs {
   readonly planId: string;

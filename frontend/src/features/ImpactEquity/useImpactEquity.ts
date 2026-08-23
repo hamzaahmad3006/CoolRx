@@ -1,5 +1,6 @@
 'use client';
 
+import { USE_FIXTURES } from '@/constants';
 import { useCallback, useMemo } from 'react';
 
 import { useAppDispatch, useAppSelector } from '@/redux/hooks';
@@ -11,7 +12,6 @@ import {
   VULNERABLE_GROUPS_FIXTURE,
 } from './impactEquity.fixture';
 
-const USE_FIXTURES = process.env.NEXT_PUBLIC_USE_FIXTURES !== 'false';
 
 /**
  * Deciles 8-10 of the Social Vulnerability Index. Used for the headline
