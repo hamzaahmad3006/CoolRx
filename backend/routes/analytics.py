@@ -114,3 +114,20 @@ def get_catalog(
 )
 def get_candidates(controller: CatalogControllerDep) -> CandidatesResponse:
     return controller.candidates()
+
+
+@router.get(
+    "/projects/{project_id}/candidates",
+    response_model=CandidatesResponse,
+    summary="Catalog plus excluded candidates, for one project",
+)
+def get_project_candidates(
+    project_id: uuid.UUID, controller: CatalogControllerDep
+) -> CandidatesResponse:
+    """The project-scoped form the UI calls.
+
+    `infeasible` is inherently per-project -- a feasibility rule is evaluated
+    against a tile's features -- so the project-scoped path is the honest one and
+    `/catalog/candidates` is kept for the catalog alone.
+    """
+    return controller.candidates()

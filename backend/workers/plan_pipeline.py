@@ -395,6 +395,31 @@ def _narrate(
     for item_id, text in run.rationales.items():
         plans.set_rationale(uuid.UUID(item_id), text)
 
+    # Store the run, verdict and all. The guard verdict is the evidence for
+    # CoolRx's central claim -- that the model never originates an authoritative
+    # number -- and a claim whose evidence is discarded after each run is an
+    # assertion. A failed verdict is recorded exactly like a clean one; keeping
+    # only the passes would make the trace a highlight reel.
+    try:
+        from dataclasses import asdict
+
+        from repositories.agent import AgentRunRepository
+
+        AgentRunRepository(plans.session).record(
+            run_id=uuid.UUID(run.run_id),
+            plan_id=uuid.UUID(run.plan_id),
+            graph_version=run.graph_version,
+            model=run.model,
+            nodes=[asdict(node) for node in run.nodes],
+            guard_verdict=run.verdict,
+            guard_violations=[asdict(v) for v in run.violations],
+            tokens_in=run.tokens_in,
+            tokens_out=run.tokens_out,
+            duration_ms=run.duration_ms,
+        )
+    except Exception as exc:  # noqa: BLE001 — the trace is not worth a failed plan
+        log.warning("plan.agent_run_not_recorded", detail=str(exc))
+
     if run.verdict != "pass":
         dropped = sum(1 for v in run.rationales.values() if v is None)
         return (

@@ -11,6 +11,8 @@ would put a fabricated reading on a map.
 
 from __future__ import annotations
 
+import json
+
 import uuid
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
@@ -209,7 +211,11 @@ class TileRepository:
                 {
                     "type": "Feature",
                     "id": tile_key,
-                    "geometry": geom_json,
+                    # ST_AsGeoJSON returns TEXT, not json. Passed through
+                    # unparsed it reaches the response model as a string and
+                    # fails validation, which is why /tiles -- the map layer --
+                    # returned 500 for every project.
+                    "geometry": json.loads(geom_json),
                     "properties": {
                         "tile_key": tile_key,
                         # None survives to the client as JSON null, which the

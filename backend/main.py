@@ -23,7 +23,7 @@ from middleware.errors import register_error_handlers
 from middleware.rate_limit import RateLimitMiddleware
 from repositories.base import check_connectivity, postgis_available, session_scope
 from repositories.catalog import CatalogError, assert_catalog_ready
-from routes import analytics, health, jobs, plans, projects
+from routes import agent, analytics, health, jobs, plans, projects, system
 
 log = structlog.get_logger(__name__)
 
@@ -198,6 +198,8 @@ def create_app() -> FastAPI:
     app.include_router(analytics.router, prefix="/api")
     app.include_router(plans.router, prefix="/api")
     app.include_router(jobs.router, prefix="/api")
+    app.include_router(system.router, prefix="/api")
+    app.include_router(agent.router, prefix="/api")
 
     return app
 
