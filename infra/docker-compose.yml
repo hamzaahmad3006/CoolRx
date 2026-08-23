@@ -89,6 +89,13 @@ services:
       FIXTURE_MODE: "true"
       LOG_FORMAT: console
       CORS_ALLOWED_ORIGINS: http://localhost:3000
+      # Passed through from the host environment, never written here. Empty is a
+      # valid value: FIXTURE_MODE means FortyGuard is served from recordings, and
+      # an absent census key makes the population providers report themselves
+      # unavailable rather than failing a run. A diagnosis started inside the
+      # container without them still completes, with exposure explicitly null.
+      FORTYGUARD_API_KEY: ${FORTYGUARD_API_KEY:-}
+      CENSUS_API_KEY: ${CENSUS_API_KEY:-}
     ports:
       - "8000:8000"
     volumes:
@@ -139,8 +146,12 @@ services:
       REDIS_URL: redis://redis:6379/0
       FIXTURE_MODE: "true"
       LOG_FORMAT: console
+      FORTYGUARD_API_KEY: ${FORTYGUARD_API_KEY:-}
+      CENSUS_API_KEY: ${CENSUS_API_KEY:-}
     volumes:
       - ../backend:/app
+    # The worker is where the pipeline actually runs, so it needs the same keys
+    # as the API. `rq` rather than `python -m rq`: the module has no __main__.
     command: ["rq", "worker", "--url", "redis://redis:6379/0", "coolrx"]
 
 volumes:

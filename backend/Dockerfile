@@ -38,11 +38,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # Dependencies first so the layer caches independently of source changes.
+#
+# `-r pyproject.toml` installs the declared dependencies WITHOUT building the
+# project. Installing `.` here instead fails with "package directory 'agent'
+# does not exist": pyproject lists the top-level packages explicitly, and at this
+# point only pyproject.toml has been copied. Copying the source first would fix
+# the error and destroy the caching this layer exists for.
 COPY pyproject.toml ./
-RUN pip install --upgrade pip uv && uv pip install --system --no-cache .
+RUN pip install --upgrade pip uv     && uv pip install --system --no-cache -r pyproject.toml
 
 # Application code, model artifacts and the intervention catalog.
 COPY . .
+
+# Now the packages exist, so the project itself can be installed. --no-deps
+# because the dependency layer above already resolved them, and re-resolving
+# would silently discard that cache.
+RUN uv pip install --system --no-cache --no-deps .
 
 # Run unprivileged.
 RUN useradd --create-home --shell /usr/sbin/nologin coolrx \
