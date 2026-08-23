@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from controllers.analytics import AnalyticsController
 from controllers.catalog import CatalogController
+from controllers.plan_views import PlanViewsController
 from controllers.diagnose import DiagnoseController
 from controllers.prescribe import PrescribeController
 from controllers.projects import ProjectController
@@ -46,6 +47,10 @@ def analytics_controller(session: SessionDep) -> AnalyticsController:
     return AnalyticsController(session)
 
 
+def plan_views_controller(session: SessionDep) -> PlanViewsController:
+    return PlanViewsController(session)
+
+
 def catalog_controller(session: SessionDep) -> CatalogController:
     return CatalogController(session)
 
@@ -54,4 +59,7 @@ ProjectControllerDep = Annotated[ProjectController, Depends(project_controller)]
 DiagnoseControllerDep = Annotated[DiagnoseController, Depends(diagnose_controller)]
 PrescribeControllerDep = Annotated[PrescribeController, Depends(prescribe_controller)]
 AnalyticsControllerDep = Annotated[AnalyticsController, Depends(analytics_controller)]
+PlanViewsControllerDep = Annotated[
+    PlanViewsController, Depends(plan_views_controller)
+]
 CatalogControllerDep = Annotated[CatalogController, Depends(catalog_controller)]

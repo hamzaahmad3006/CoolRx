@@ -100,6 +100,16 @@ class PlanRepository:
     def __init__(self, session: Session) -> None:
         self._session = session
 
+    @property
+    def session(self) -> Session:
+        """The unit of work this repository is part of.
+
+        Exposed so a caller already holding this repository can enlist a sibling
+        one in the same transaction, rather than opening a second session that
+        could commit independently of the plan it describes.
+        """
+        return self._session
+
     def create(
         self,
         *,
