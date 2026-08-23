@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Response, status
 
 from schemas.common import ProvenanceResponse
 from schemas.plans import CounterfactualResponse, PlanResponse
@@ -20,7 +20,9 @@ from schemas.verification import (
     VerifyRequest,
 )
 
-from .deps import PlanViewsControllerDep, PrescribeControllerDep
+from controllers.plan_report import build_plan_report
+
+from .deps import PlanViewsControllerDep, PrescribeControllerDep, SessionDep
 
 router = APIRouter(prefix="/plans", tags=["plans"])
 
@@ -61,6 +63,31 @@ def verification_protocol(
     plan_id: uuid.UUID, controller: PlanViewsControllerDep
 ) -> VerificationProtocolResponse:
     return controller.verification_protocol(plan_id)
+
+
+@router.get(
+    "/{plan_id}/report.pdf",
+    summary="The Cooling Action Plan as a PDF",
+    response_class=Response,
+    responses={200: {"content": {"application/pdf": {}}}},
+)
+def report_pdf(plan_id: uuid.UUID, session: SessionDep) -> Response:
+    """Generated from the database, not printed from the page.
+
+    A browser print captures whatever the client rendered; this is produced by
+    one code path from stored values, and `report/pdf.py` refuses to emit a
+    document at all if any headline figure lacks a provenance record.
+
+    Content-Disposition is `inline` rather than `attachment`: a judge clicking
+    this should see the report, not a file in their downloads folder. The
+    filename still travels with it for anyone who saves it.
+    """
+    pdf, filename = build_plan_report(session, plan_id)
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{filename}"'},
+    )
 
 
 @router.post(

@@ -42,6 +42,7 @@ export function ActionPlanPage({ planId }: { readonly planId: string }) {
     errorMessage,
     isPrinting,
     onDownload,
+    onPrint,
   } = useActionPlan({ planId });
 
   if (isLoading) {
@@ -140,8 +141,14 @@ export function ActionPlanPage({ planId }: { readonly planId: string }) {
         </div>
 
         <div className="flex gap-2 print:hidden">
+          {/* Two artefacts, named for what they are. The download is built by
+              the backend and refuses to exist without provenance; the print is
+              the page itself. */}
           <Button variant="secondary" icon="download" onClick={onDownload}>
-            {isPrinting ? 'Preparing…' : 'Download PDF'}
+            Download PDF
+          </Button>
+          <Button variant="ghost" icon="download" onClick={onPrint}>
+            {isPrinting ? 'Preparing…' : 'Print this page'}
           </Button>
         </div>
       </header>

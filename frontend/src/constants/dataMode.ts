@@ -24,3 +24,12 @@ export const USE_FIXTURES: boolean =
 
 /** The inverse, where reading it that way makes a call site clearer. */
 export const USE_LIVE_BACKEND: boolean = !USE_FIXTURES;
+
+
+/**
+ * Origin of the backend, for URLs the browser navigates to directly rather than
+ * fetching. Kept beside the data-mode flag because the two are always read
+ * together, and matches the base `coolRxApi` builds its requests from.
+ */
+export const API_BASE_URL: string =
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8000';

@@ -1,6 +1,6 @@
 'use client';
 
-import { USE_FIXTURES } from '@/constants';
+import { API_BASE_URL, USE_FIXTURES } from '@/constants';
 import { useCallback, useMemo, useState } from 'react';
 
 import type { InterventionCategory } from '@/constants';
@@ -33,6 +33,8 @@ interface UseActionPlanResult {
   readonly errorMessage: string | null;
   readonly isPrinting: boolean;
   readonly onDownload: () => void;
+  /** Print the reviewed page itself. */
+  readonly onPrint: () => void;
 }
 
 export function useActionPlan({ planId }: UseActionPlanArgs): UseActionPlanResult {
@@ -89,12 +91,20 @@ export function useActionPlan({ planId }: UseActionPlanArgs): UseActionPlanResul
   /**
    * Print to PDF via the browser.
    *
-   * Deliberately not a server-rendered download yet: the print stylesheet renders
-   * the same DOM the reader just reviewed, so the PDF cannot disagree with the
-   * page. A server-side renderer is a second code path that can drift, and the
-   * report's whole claim is that every figure traces to one source.
+   * Two ways out, because they are different artefacts.
+   *
+   * `onPrint` renders the same DOM the reader just reviewed, so what comes out
+   * cannot disagree with what was on screen. That is a real property and it is
+   * why this path stays.
+   *
+   * `onDownload` asks the backend to build the report from stored values. It is
+   * a second code path, which is a cost — but it is the only one that can
+   * *refuse*: `report/pdf.py` will not emit a document whose headline figures
+   * lack provenance, and a print stylesheet has no way to enforce that. It also
+   * produces a byte-identical file every time, where a print depends on the
+   * reader's browser, zoom and background-graphics setting.
    */
-  const onDownload = useCallback((): void => {
+  const onPrint = useCallback((): void => {
     setIsPrinting(true);
     // Let the state change paint before the modal print dialog blocks the thread.
     window.setTimeout(() => {
@@ -102,6 +112,17 @@ export function useActionPlan({ planId }: UseActionPlanArgs): UseActionPlanResul
       setIsPrinting(false);
     }, 50);
   }, []);
+
+  const onDownload = useCallback((): void => {
+    // A new tab rather than a hidden anchor: the reader sees the report render
+    // and can decide whether to keep it, which is how a document meant to be
+    // forwarded should behave.
+    window.open(
+      `${API_BASE_URL}/api/plans/${planId}/report.pdf`,
+      '_blank',
+      'noopener,noreferrer',
+    );
+  }, [planId]);
 
   return {
     plan,
@@ -114,5 +135,6 @@ export function useActionPlan({ planId }: UseActionPlanArgs): UseActionPlanResul
       !USE_FIXTURES && planQuery.isError ? 'We couldn’t load this plan.' : null,
     isPrinting,
     onDownload,
+    onPrint,
   };
 }
