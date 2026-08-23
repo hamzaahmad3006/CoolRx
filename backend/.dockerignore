@@ -1,0 +1,26 @@
+# Build context hygiene. Without this the image carries ~40 MB of material that
+# only ever runs on a developer's machine, and rebuilds ship the whole lot again.
+
+# Local virtualenv — a Windows venv is not runnable in a Linux container and is
+# by far the largest thing in this directory.
+.venv/
+**/__pycache__/
+*.pyc
+
+# Test and lint caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+tests/
+
+# Training-time only. `data/features/` is the enrichment cache the model was fit
+# from; the container serves a trained model and never rebuilds the matrix.
+data/features/
+
+# Secrets never belong in an image layer, even one that is never pushed.
+.env
+.env.*
+
+# Editor and OS noise
+.DS_Store
+*.swp
