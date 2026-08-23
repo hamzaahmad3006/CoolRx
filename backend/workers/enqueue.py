@@ -44,7 +44,11 @@ def enqueue_diagnose(
             granularity,
             threshold_c,
             build_ladder,
-            job_id=f"diagnose:{job_id}",
+            # Dash, not colon: RQ 2.x rejects a colon in a job id, and the
+            # rejection message ("must only contain letters, numbers,
+            # underscores and dashes") does not name the offending character.
+            # A UUID satisfies that rule; the separator did not.
+            job_id=f"diagnose-{job_id}",
         )
     except Exception as exc:  # noqa: BLE001 — surfaced as EnqueueFailed
         log.error("enqueue.failed", kind="diagnose", detail=str(exc))
@@ -75,7 +79,7 @@ def enqueue_plan(
             objective,
             equity_lambda,
             threshold_c,
-            job_id=f"plan:{job_id}",
+            job_id=f"plan-{job_id}",
         )
     except Exception as exc:  # noqa: BLE001
         log.error("enqueue.failed", kind="plan", detail=str(exc))
