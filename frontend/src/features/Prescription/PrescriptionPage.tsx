@@ -1,6 +1,7 @@
 'use client';
 
 import { DISCLAIMER, EMPTY_STATE } from '@/constants';
+import { useDistrictLabel } from '@/features/shared/useDistrictLabel';
 import {
   formatCurrency,
   formatHours,
@@ -27,8 +28,6 @@ import {
 
 interface PrescriptionPageProps {
   readonly projectId: string;
-  readonly districtName: string;
-  readonly districtContext: string;
 }
 
 /**
@@ -41,9 +40,9 @@ interface PrescriptionPageProps {
  */
 export function PrescriptionPage({
   projectId,
-  districtName,
-  districtContext,
 }: PrescriptionPageProps) {
+  const { districtName, districtContext } = useDistrictLabel(projectId);
+
   const {
     plan,
     isOptimizing,

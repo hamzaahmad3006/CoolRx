@@ -1,5 +1,6 @@
 'use client';
 
+import { USE_FIXTURES } from '@/constants';
 import { useCallback, useMemo, useState } from 'react';
 
 import type { InterventionCategory } from '@/constants';
@@ -9,7 +10,6 @@ import type { Plan, PlanItem, ProvenanceRecord } from '@/types';
 
 import { PROVENANCE_FIXTURE } from './actionPlan.fixture';
 
-const USE_FIXTURES = process.env.NEXT_PUBLIC_USE_FIXTURES !== 'false';
 
 export interface CategoryRollup {
   readonly category: InterventionCategory;

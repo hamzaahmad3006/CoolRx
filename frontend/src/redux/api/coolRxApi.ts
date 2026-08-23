@@ -7,6 +7,7 @@ import type {
   CounterfactualResponse,
   CreatePlanRequest,
   CreatePlanResponse,
+  ListPlansResponse,
   CreateProjectRequest,
   CreateProjectResponse,
   CreditsResponse,
@@ -160,6 +161,11 @@ export const coolRxApi = createApi({
       invalidatesTags: ['Plan'],
     }),
 
+    listPlans: build.query<ListPlansResponse, string>({
+      query: (projectId) => `projects/${projectId}/plans`,
+      providesTags: ['Plan'],
+    }),
+
     getPlan: build.query<GetPlanResponse, string>({
       query: (planId) => `plans/${planId}`,
       providesTags: (_r, _e, planId) => [{ type: 'Plan', id: planId }],
@@ -228,6 +234,7 @@ export const {
   useGetPrioritiesQuery,
   useGetCandidatesQuery,
   useCreatePlanMutation,
+  useListPlansQuery,
   useGetPlanQuery,
   useGetCounterfactualQuery,
   useGetProvenanceQuery,

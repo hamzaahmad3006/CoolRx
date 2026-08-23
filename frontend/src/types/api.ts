@@ -198,8 +198,25 @@ export interface CreatePlanRequest {
   readonly thresholdC?: number;
 }
 
-export type CreatePlanResponse = Plan;
+/**
+ * Plan creation is asynchronous, exactly like a diagnosis.
+ *
+ * This was typed as `Plan`, so the client believed the optimiser returned a
+ * finished plan from the POST. The backend answers 202 with a job envelope, the
+ * plan was never fetched, and the page sat on "No plan yet" while the worker
+ * completed the job perfectly.
+ */
+export interface CreatePlanResponse {
+  readonly jobId: string;
+  readonly status: 'queued';
+  readonly stages: readonly string[];
+}
 export type GetPlanResponse = Plan;
+
+/** Newest first, as the backend orders them. */
+export interface ListPlansResponse {
+  readonly plans: readonly Plan[];
+}
 
 export interface CounterfactualResponse {
   /** Predicted post-intervention field. */

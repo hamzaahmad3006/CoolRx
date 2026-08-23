@@ -1,13 +1,13 @@
 'use client';
 
 import { useMemo } from 'react';
+import { USE_FIXTURES } from '@/constants';
 
 import { useGetAgentTraceQuery } from '@/redux/api/coolRxApi';
 import type { AgentRun, GuardVerdict } from '@/types';
 
 import { AGENT_RUN_FIXTURE } from './agentTrace.fixture';
 
-const USE_FIXTURES = process.env.NEXT_PUBLIC_USE_FIXTURES !== 'false';
 
 interface UseAgentTraceArgs {
   readonly runId: string;

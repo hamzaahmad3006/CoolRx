@@ -1,5 +1,7 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
+import { USE_FIXTURES } from '@/constants';
+
 import { FG_LIMITS } from '@/constants';
 import type { DataMode, FgGranularity, SessionState } from '@/types';
 
@@ -7,9 +9,13 @@ import type { DataMode, FgGranularity, SessionState } from '@/types';
  * The data mode must agree with how the app is actually running. When fixtures
  * are enabled, the top-bar badge has to read "Fixture data" — a badge claiming
  * "Live" over fixture numbers is exactly the confusion FR-022 forbids.
+ *
+ * This is only the *initial* value, and it describes which code path the client
+ * takes. It is not the last word on where the numbers came from: the backend can
+ * itself be running in fixture mode, and `/health` reports that. The shell
+ * shows the API's answer once it has one, which is the authoritative source.
  */
-const INITIAL_DATA_MODE: DataMode =
-  process.env.NEXT_PUBLIC_USE_FIXTURES === 'true' ? 'fixture' : 'live';
+const INITIAL_DATA_MODE: DataMode = USE_FIXTURES ? 'fixture' : 'live';
 
 /**
  * Default measurement window. A hot summer afternoon is the meaningful case for
