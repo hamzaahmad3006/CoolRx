@@ -38,19 +38,52 @@ four FortyGuard analytics — `tcm`, `exceedance`, `persistence`, `time_of_measu
 > head height, on this block, at this hour."
 
 **On screen:** analytic layers toggling; the hotspot ranking appearing.
-**Say the number:** district mean, hottest tile, hours above threshold.
+
+**Say these numbers** — they are what central Phoenix actually returns, verified
+2026-08-23. Do not round them up on camera:
+
+| | |
+|---|---|
+| district mean | **37.07 °C** |
+| range across the district | **36.80 – 37.13 °C** |
+| blocks measured | **1,190** |
+| top block by exposure | **49 person-heat-hours** |
+
+The legend must read about 36.8–37.1. If it reads 0–1 the frontend is on an old
+build and the map is meaningless.
 
 ### 1:10–1:55 · Prescribe — the part nobody else has
 
-Open the plan. Move the budget slider once and let the portfolio visibly change.
+Set the budget, press **Optimize plan**, and let it run — it is a background job
+and takes a few seconds. Do not cut this; watching it solve is the point.
 
 > "Every intervention carries a predicted ΔT with a prediction interval, not a point
 > estimate. The cost and the effect range come from published sources — the citation
 > is in the report a planner reads."
 
-**On screen:** budget slider → plan re-solves → before/after swipe on a locked colour
-domain.
-**Say one interval out loud**, e.g. *"−1.8 to −0.5 °C"*, so the honesty is audible.
+**On screen:** budget → plan solves → before/after swipe on one locked colour domain.
+
+**Say one interval out loud** so the honesty is audible. The real one at a
+$400,000 budget:
+
+> "Minus one point six degrees, with an interval of minus two point zero to minus
+> one point two. That range is not the model's confidence — it is the published
+> range from the EPA compendium and Brousse 2024, and the model is clamped to it."
+
+| | |
+|---|---|
+| blocks selected | **60** |
+| committed | **$393,840** of $400,000 |
+| per block | **$6,564** for 400 m² of cool-roof membrane |
+| predicted ΔT | **−1.6 °C (−2.0 to −1.2)** |
+| dangerous hours avoided | **18** |
+| people reached | **1,827** |
+| person-heat-hours | **539** |
+
+On the Before/After screen the shared scale reads **35.2 – 37.1 °C** and the
+predicted-change histogram is **negative**. If it is positive, stop and fix it
+before recording — that means the page is differencing a model prediction against
+a measurement instead of applying the plan's cooling.
 
 ### 1:55–2:30 · The Cooling Action Plan
 
@@ -65,14 +98,31 @@ Generate the PDF. Scroll it on screen.
 
 Do this. It is the strongest 20 seconds in the video and almost nobody does it.
 
-> "This compares two measurements. A later re-measure will include weather variation,
-> not just the intervention — the control-tile comparison reduces that confound, it does
-> not remove it. CoolRx says so on the screen where the number appears."
+Open **Methods** and read the model card on camera. It is generated from the
+model's own metrics file, so it cannot flatter the model.
+
+> "This model does not transfer. On a city it was not trained on it explains
+> essentially none of the variation — R squared of minus zero point zero zero
+> nine. It is about as accurate as predicting the district average, and the page
+> says so. The intervals hold ninety-three percent against a nominal eighty, so
+> they are wider than calibrated — cautious, not overconfident, and labelled as
+> neither. And two features have no citable source, which means an intervention
+> acting only through them is predicted to do exactly nothing. Not a small
+> effect. Nothing."
+
+Then the verification caveat:
+
+> "A later re-measure will include weather variation, not just the intervention.
+> The control tiles are named in the protocol before any follow-up exists, so they
+> cannot be chosen afterwards to flatter the result. That reduces the confound. It
+> does not remove it."
 
 ### 2:50–3:00 · Close
 
-> "US coverage today, because that is where the instrument reads. Built solo in twelve
-> days on the FortyGuard Temperature API."
+> "US coverage today, because that is where the instrument reads. Built solo on
+> the FortyGuard Temperature API — every number on screen traces to a measurement
+> or a citation, and the ones that do not exist are labelled as missing rather
+> than filled in."
 
 ---
 

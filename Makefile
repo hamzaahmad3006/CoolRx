@@ -12,12 +12,14 @@
 SHELL := /bin/bash
 COMPOSE := docker compose -f infra/docker-compose.yml
 PY := backend/.venv/Scripts/python.exe          # Windows venv layout
+WORKER := .venv/Scripts/rq.exe
 ifeq (,$(wildcard backend/.venv/Scripts/python.exe))
 PY := backend/.venv/bin/python                  # POSIX venv layout
+WORKER := .venv/bin/rq
 endif
 
 .DEFAULT_GOAL := help
-.PHONY: help demo demo-down setup services migrate api worker web test test-fast lint fixtures fixtures-plan train check
+.PHONY: help demo demo-down setup services migrate seed api worker web test test-fast lint fixtures fixtures-plan train check
 
 help:  ## Show the available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -27,17 +29,22 @@ help:  ## Show the available targets
 
 demo: ## Run the whole stack offline from committed fixtures — no API key needed
 	@echo "──> CoolRx demo · fixture mode · no FortyGuard key required"
-	@test -n "$$(ls backend/data/fixtures/*.json 2>/dev/null)" \
-		|| { echo "ERROR: no fixtures committed. Run 'make fixtures' with a key."; exit 1; }
+	@test -n "$$(ls backend/data/fixtures/*.json 2>/dev/null)" 		|| { echo "ERROR: no fixtures committed. Run 'make fixtures' with a key."; exit 1; }
 	@echo "──> $$(ls backend/data/fixtures/*.json | wc -l) recorded responses found"
-	FIXTURE_MODE=true FIXTURE_STRICT=true $(COMPOSE) up -d --build
+	FIXTURE_MODE=true FIXTURE_STRICT=true $(COMPOSE) --profile api up -d --build
+	@echo "──> waiting for the API to report ready"
+	@until curl -fsS http://localhost:8000/api/health/ready >/dev/null 2>&1; do sleep 3; done
+	@echo "──> loading the intervention catalog"
+	@$(COMPOSE) --profile api exec -T api python -m scripts.load_catalog
+	@echo "──> seeding the preset districts"
+	@$(COMPOSE) --profile api exec -T api python -m scripts.seed_presets
 	@echo
-	@echo "    API   http://localhost:8000/api/health"
-	@echo "    Docs  http://localhost:8000/docs"
-	@echo "    Web   http://localhost:3000   (run 'make web' if not containerised)"
+	@echo "    Web   http://localhost:3000"
+	@echo "    API   http://localhost:8000/api/health/ready"
+	@echo "    Docs  http://localhost:8000/api/docs"
 	@echo
-	@echo "    Districts available offline: phoenix"
-	@echo "    lasvegas and tucson need 'make fixtures DISTRICT=<name>' with a key."
+	@echo "    Districts available offline: phoenix, lasvegas, tucson"
+	@echo "    Open a district and press Prescribe. No API credits are spent."
 
 demo-down: ## Stop the demo stack and drop its volumes
 	$(COMPOSE) down -v
@@ -56,11 +63,22 @@ services: ## Start only Postgres and Redis (what the service-dependent tests nee
 migrate: ## Apply database migrations
 	cd backend && ../$(PY) -m alembic upgrade head
 
+seed: ## Load the catalog and create the preset districts (needs `make migrate` first)
+	cd backend && ../$(PY) -m scripts.load_catalog
+	cd backend && ../$(PY) -m scripts.seed_presets
+
 api: ## Run the API locally against the compose services
 	cd backend && ../$(PY) -m uvicorn main:app --reload --port 8000
 
 worker: ## Run the RQ worker locally
-	cd backend && ../$(PY) -m rq worker coolrx
+	# `rq` the console script, not `python -m rq`: the package has no __main__
+	# and the module form fails with "No module named rq.__main__".
+	#
+	# SimpleWorker because RQ's default worker calls os.fork(), which does not
+	# exist on Windows — the worker starts, accepts a job, and dies with
+	# AttributeError the moment one arrives. On Linux the default is fine, which
+	# is why the container does not pass this flag.
+	cd backend && ../$(WORKER) worker coolrx --url "$${REDIS_URL:-redis://localhost:6379/0}" 		--worker-class rq.worker.SimpleWorker
 
 web: ## Run the Next.js frontend
 	cd frontend && npm run dev
