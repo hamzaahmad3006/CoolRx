@@ -14,7 +14,7 @@ from typing import Literal
 
 from pydantic import Field
 
-from .common import ApiModel, RequestModel, DateString, Granularity, TimeString
+from .common import ApiModel, DateString, Granularity, RequestModel, TimeString
 
 JobKind = Literal["diagnose", "plan", "verify", "harvest"]
 JobStatus = Literal["queued", "running", "completed", "failed", "degraded"]

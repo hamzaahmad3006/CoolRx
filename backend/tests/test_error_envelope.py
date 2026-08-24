@@ -32,7 +32,6 @@ from middleware.correlation import CorrelationIdMiddleware
 from middleware.errors import register_error_handlers
 from schemas.common import ApiErrorCode, RequestModel
 
-
 # ═════════════════════════════════════════════════════════════════════════════
 # The mapping table
 # ═════════════════════════════════════════════════════════════════════════════

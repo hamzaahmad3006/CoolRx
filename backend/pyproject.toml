@@ -101,6 +101,10 @@ dev = [
     "pytest-asyncio>=0.24",
     "pytest-cov>=6.0",
     "respx>=0.21",
+    # `tests/test_plan_report.py` reads the rendered PDF back rather than trusting
+    # the builder, so the reader is a test requirement. Without it CI reported
+    # three collection errors that looked like report regressions.
+    "pypdf>=4.0",
     "ruff>=0.8",
     "mypy>=1.13",
     "types-requests>=2.32",
@@ -112,13 +116,52 @@ line-length = 88
 src = ["."]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "N", "UP", "B", "A", "C4", "SIM", "RUF", "ASYNC", "S"]
+# BLE is selected so the `# noqa: BLE001` directives stay meaningful. Every
+# broad `except Exception` in this codebase is deliberate -- a provider that
+# degrades rather than raising, a readiness probe that must not itself fail --
+# and each carries the reason on the same line. With the rule unselected those
+# directives read as unused and an autofix deletes the reasoning with them.
+select = ["E", "F", "I", "N", "UP", "B", "A", "C4", "SIM", "RUF", "ASYNC", "S", "BLE"]
 ignore = [
     "S101",  # assert is fine in tests
+
+    # Each of the five below is a deliberate convention, not an unfixed warning.
+    # They are listed here rather than suppressed line by line so the reason is
+    # in one place and a reviewer can disagree with it in one place.
+
+    # N818 — exception names without an `Error` suffix. `FortyGuardTimeout`,
+    # `CreditReserveExhausted`, `ModelNotTrained` and `OutOfSupport` name the
+    # condition the caller must handle, and they are referred to by these names
+    # in the SRS and in `docs/`. Renaming thirteen classes across code, tests and
+    # prose would churn more than the inconsistency costs.
+    "N818",
+
+    # RUF001/2/3 — "ambiguous" Unicode in strings, docstrings and comments. The
+    # prose deliberately uses −, ×, – and σ where those are the correct
+    # characters. In `agent/numeric_guard.py` the U+2212 MINUS SIGN is
+    # load-bearing: the guard must recognise the typographic minus a language
+    # model emits, so "correcting" it to a hyphen would open the bypass the
+    # module exists to close.
+    "RUF001",
+    "RUF002",
+    "RUF003",
+
+    # RUF046 — `int(round(x))` flagged as a redundant cast. It is not redundant
+    # here: the raster providers pass numpy scalars, and `round(np.float64)`
+    # returns another numpy float rather than an int. Taking the cast out would
+    # change the type flowing into the tile grid.
+    "RUF046",
+
+    # B008 — function calls in argument defaults. `Query(...)` and `Depends(...)`
+    # in a signature is FastAPI's own idiom; the rule cannot see the framework.
+    "B008",
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S105", "S106"]
+# S311 stays enabled for the application, where `clients/fortyguard/client.py`
+# suppresses it on the one line that needs it. In tests `random` only generates
+# synthetic feature values from a fixed seed, so the rule has nothing to say.
+"tests/**" = ["S105", "S106", "S311"]
 
 [tool.mypy]
 python_version = "3.12"
@@ -132,6 +175,9 @@ plugins = ["pydantic.mypy"]
 module = [
     "geopandas.*", "rasterio.*", "rasterstats.*", "shapely.*",
     "lightgbm.*", "shap.*", "sklearn.*", "weasyprint.*", "rq.*",
+    # reportlab ships no stubs; `report/pdf.py` is the only importer and its own
+    # signatures are still checked.
+    "reportlab.*",
 ]
 ignore_missing_imports = true
 

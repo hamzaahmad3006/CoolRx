@@ -169,7 +169,6 @@ class _MrlcPercentLayer(FeatureProvider):
         self, west: float, south: float, east: float, north: float
     ) -> tuple[Any, Any]:
         """One GetMap for the whole AOI, read into memory as a GeoTIFF."""
-        import httpx
         import rasterio
 
         # Size the request to NLCD's own grid. At least 2 px each way so a tiny
@@ -197,7 +196,7 @@ class _MrlcPercentLayer(FeatureProvider):
         payload = response.content
         # A WMS error comes back as XML with a 200, so the magic bytes are what
         # actually distinguishes a raster from a ServiceExceptionReport.
-        if not payload[:2] in (b"II", b"MM"):
+        if payload[:2] not in (b"II", b"MM"):
             raise ValueError(
                 f"expected a GeoTIFF, got {payload[:80]!r}"
             )

@@ -32,8 +32,8 @@ from .analytics import (
     StatsResponse,
     TileFeature,
     TileFeaturesResponse,
-    TileProperties,
     TilePriorityResponse,
+    TileProperties,
     TilesResponse,
 )
 from .common import (
@@ -196,8 +196,8 @@ __all__ = [
     "StatsResponse",
     "TileFeature",
     "TileFeaturesResponse",
-    "TileProperties",
     "TilePriorityResponse",
+    "TileProperties",
     "TilesResponse",
     "TimeString",
     "ValidateAoiRequest",

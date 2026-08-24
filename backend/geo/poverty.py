@@ -153,7 +153,6 @@ class PovertyProvider(FeatureProvider):
 
     def _poverty_rates(self, groups: list[dict[str, Any]]) -> dict[str, float]:
         """Tract GEOID → poverty rate, one ACS request per tract."""
-        import httpx
 
         tracts: set[tuple[str, str, str]] = set()
         for feature in groups:
@@ -210,7 +209,7 @@ class PovertyProvider(FeatureProvider):
                 continue
             try:
                 geometry = shape(feature["geometry"])
-            except Exception:  # noqa: BLE001
+            except Exception:  # noqa: BLE001, S112 — a malformed feature is skipped; not logged, because these loops run over thousands of upstream records and a line per skip would drown the run
                 continue
             if geometry.is_empty:
                 continue

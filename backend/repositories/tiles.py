@@ -12,7 +12,6 @@ would put a fabricated reading on a map.
 from __future__ import annotations
 
 import json
-
 import uuid
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass

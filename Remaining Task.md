@@ -3,11 +3,158 @@
 Working document. Tasks are ordered by dependency, so doing them top-to-bottom
 avoids writing anything twice.
 
-**Last updated:** 2026-08-23 · **Target:** core complete 24 Aug, submit by 29 Aug ·
-**Tests:** 739 passing, 0 skipped with Postgres and Redis up
+**Last updated:** 2026-08-24 · **Target:** core complete 24 Aug, submit by 29 Aug ·
+**Tests:** 742 passing, 0 skipped with Postgres and Redis up
 
 > Everything below the "Status at a glance" table is the older working log, kept
 > for its reasoning. Where it disagrees with this header, this header is right.
+
+---
+
+## 24 August — portability pass
+
+The suite had only ever been run on this machine's Python 3.14. Running it on
+**3.12 — the version in `backend/Dockerfile` and in CI** — surfaced three defects
+that 3.14 hides, and a fourth that nothing hid.
+
+### P0 · Every domain error was a 500 on 3.12 and 3.13
+
+`CoolRxError` is `@dataclass(slots=True)` and its `__post_init__` called
+zero-argument `super().__init__`. A slots dataclass is a *replacement* class, and
+below CPython 3.14 the `__class__` cell captured by that `super()` still points at
+the discarded original, so the call raises
+
+```
+TypeError: super(type, obj): obj must be an instance or subtype of type
+```
+
+**at construction**. Every `NotFoundError`, `AoiRejectedError`,
+`JobAlreadyRunningError` and `ValidationFailedError` therefore escaped as an
+unhandled 500 instead of its mapped status — a rejected AOI would have told a
+judge "something went wrong" instead of "63.20 mi² is above the 10.00 mi² limit".
+
+It has never shown up locally because 3.14 started rewriting that cell. It would
+have shown up on the deployed demo, which is `python:3.12-slim`.
+
+- [x] `Exception.__init__(self, self.message)` explicitly, with the reason recorded
+      at the call site
+- [x] Verified on 3.12: `tests/test_error_envelope.py` 18/18, was 14/18
+
+### P1 · The per-run statistics block was null for every temperature run
+
+`stats_data` is not one shape. `tcm` nests its figures under
+`stats_data.temperature_stats` as `minimum` / `maximum` / `standard_deviation`;
+exceedance, persistence and time-of-measure send a flat `min` / `max` / `mean`
+with `n_cells` and `units`. `analytic_run_to_response` validated the stored blob
+straight into the flat `FgStats`, so it read the second shape and returned an
+all-null block for the first — and raised nothing, because every field on
+`FgStats` is optional by design.
+
+The effect was quiet in exactly the way that survives review: the exceedance runs
+listed beside it looked correct, and the project summary was right too, because
+`AnalyticsController._stats_of` had already been fixed to read the nested block.
+Only the `tcm` row — the run the whole diagnosis is about — was empty.
+
+- [x] `controllers.adapters.stats_of_run` reads both shapes: `read_stat` first,
+      then the flat short keys, then `n_cells` as the count
+- [x] 3 regression tests, one per shape plus the empty case
+- [x] Verified against a live run: `tcm` now reports min 36.8048 / max 37.1297 /
+      mean 37.0735 / std 0.0601, matching the summary block exactly
+
+### P1 · CI could not have been green
+
+Three separate reasons, all in the backend job:
+
+  1. `tests/test_plan_report.py` imports `pypdf`, which was in no dependency
+     group — 3 collection errors that read as report regressions.
+  2. No `alembic upgrade head`, so the Postgres-backed tests ran against an empty
+     database and the readiness checks failed on a missing table.
+  3. No catalog load, so AC-23's "the boot gate refuses an empty catalog" test
+     asserted against an empty catalog.
+
+- [x] `pypdf` added to the `dev` extra
+- [x] `Migrate` and `Load intervention catalog` steps added before `Tests`
+- [x] `ruff check .` — 207 findings at HEAD, now **clean**. 97 auto-fixed, 27 files
+      run through `ruff format`, the rest fixed by hand. Five rule families are
+      ignored in `pyproject.toml` with the reason written next to each; the one
+      worth naming is **RUF001 in `agent/numeric_guard.py`**, where the U+2212
+      MINUS SIGN is load-bearing — the guard has to recognise the typographic
+      minus a model emits, so "correcting" it to a hyphen would open the bypass
+      the module exists to close.
+- [x] Two real defects fell out of the lint pass: `Any` was used in
+      `repositories/catalog.py` without being imported (harmless under
+      `from __future__ import annotations`, a `NameError` the moment anything
+      calls `get_type_hints`), and `routes/system.py` shadowed the `credits`
+      builtin.
+
+### P1 · FR-006 and FR-007 were never fetched
+
+`optimizer/priorities.py` looks up the latest `persistence` and `time_of_measure`
+run and converts the peak hour to district-local; `PriorityRow` carries
+`persistence_hours` and `peak_hour_local`; the frontend ships a peak-hour clock;
+and `controllers/projects.py` quotes a diagnosis at *one tcm, one time_of_measure,
+one persistence and eleven exceedance steps*. The pipeline was the only link that
+never made the two calls — so the credit estimate charged for them, both columns
+were null for every tile, and the clock had nothing to draw.
+
+- [x] `_fetch_secondary_analytics` in `workers/pipeline.py`, after the ladder.
+      Each call is caught separately: a failure costs two columns and is named in
+      the degradation reason, rather than failing a diagnosis whose temperature
+      field and ladder are already persisted
+- [x] Verified on a live run: `persistenceHours` 1.0 and `peakHourLocal` 22 now
+      populate, and the run stores `tcm`, `time_of_measure`, `persistence` and
+      11 × `exceedance`
+- [x] Zero credits in fixture mode — both were harvested for all three districts
+      back in August and were sitting unused
+
+**Both columns are constant across a district, and that is arithmetic.** A
+diagnosis requests a single hour, so hours-above-threshold can only be 0 or 1
+(Phoenix reads 1.0 at ~37 °C, Las Vegas 0.0 at ~34.6 °C) and a peak hour chosen
+from a one-hour window has one candidate. They carry spatial information only
+over a multi-hour window. Recorded in the module docstring so a reviewer does not
+read a constant column as a bug — and so whoever widens the window knows where to
+look. Also noted there: FR-007 specifies converting the peak hour with
+`env_params.metadata.timezone_offset_hours`, and the code converts from longitude
+because `env_params` (FR-008) is not wired. They agree for all three preset
+districts, which are MST with no daylight saving. They will not agree everywhere.
+
+### Verified rather than assumed
+
+- **Parser against all 45 recordings** — 84,242 tiles, every one carrying a value,
+  zero parse failures. `tcm` reads 30.18–37.28 °C across the six AOIs; Phoenix
+  district 36.80–37.13, which is the legend `docs/LOCAL-TESTING.md` predicts.
+- **Full journey, live services** — seed → diagnose (70 s, `degraded`, 1,190 tiles)
+  → priorities → plan (76 items, $498,864 of a $500,000 budget, ΔT −1.6 °C
+  [−2.0, −1.2] from the cool-roof row) → **4-page PDF** with the attribution on
+  every page.
+- **Model retrains reproducibly offline** from the committed feature cache and
+  reproduces the shipped artefacts byte for byte — same MAE 0.273, R² −0.009,
+  coverage 0.930, width 0.601 °C.
+- **AC-15** — production bundle built and grepped: no FortyGuard, Anthropic or
+  Groq key present.
+- **`tsc --noEmit`** clean; `next build` compiles all 11 routes.
+
+### Found, not fixed — decisions for you
+
+- **No LLM key is configured.** `ANTHROPIC_API_KEY` and `GROQ_API_KEY` are both
+  empty, so every plan finishes `degraded` with "plan text was not generated" and
+  `/api/agent/plans/{id}/trace` returns 404. The figures are unaffected — that is
+  the design — but the Agent Trace screen has nothing to show, and it is one of
+  the ten screens. Groq's free tier needs no card.
+- **The demo needs the internet, not just credits.** `FIXTURE_MODE=true` removes
+  the FortyGuard calls, but the enrichment stage still fetches NLCD, 3DEP, ACS and
+  Overpass live, so a diagnosis run without network resolves no features, no
+  population, and no attribution. `data/features/*.json` already holds real
+  provider output for all six AOIs; letting the pipeline fall back to it would
+  make `make demo` genuinely offline. Not done here: it changes the most important
+  pipeline stage, and how a cached-feature run is labelled is a provenance
+  decision, not a refactor.
+- **`next/font/google` fetches at build time**, so any build host without access
+  to `fonts.googleapis.com` fails the production build outright. Fine on Railway;
+  worth knowing before it surprises you.
+- **mypy reports 506 errors under `strict` + `disallow_any_explicit`.** CI has it
+  `continue-on-error`, so nothing is blocked. Pre-existing, untouched.
+- **ESLint: 7 errors, 48 warnings.** CI does not run it. Untouched.
 
 ---
 

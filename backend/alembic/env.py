@@ -11,9 +11,9 @@ from __future__ import annotations
 
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy import engine_from_config, pool
 
+from alembic import context
 from core.config import get_settings
 from repositories.tables import Base
 
@@ -33,9 +33,7 @@ _IGNORED_TABLES = {"spatial_ref_sys", "geography_columns", "geometry_columns"}
 def include_object(
     obj: object, name: str | None, type_: str, reflected: bool, compare_to: object
 ) -> bool:
-    if type_ == "table" and name in _IGNORED_TABLES:
-        return False
-    return True
+    return not (type_ == "table" and name in _IGNORED_TABLES)
 
 
 def run_migrations_offline() -> None:

@@ -78,8 +78,12 @@ separate. Groq's free tier needs no card.
 cd backend && pytest -q
 ```
 
-530 tests, no database or network required. `cd frontend && npx tsc --noEmit` for the
-type check.
+742 tests. 700 of them need neither a database nor the network; the remaining 42
+exercise the Postgres-backed routes and skip with a reason when no database
+answers. `cd frontend && npx tsc --noEmit` for the type check.
+
+CI runs the full 742 against Postgres and Redis service containers with **no
+FortyGuard key present**, which is AC-13 enforced rather than asserted.
 
 ---
 
@@ -157,7 +161,7 @@ backend/
   report/               Cooling Action Plan PDF
   repositories/         The only layer holding SQL
   controllers/          Business logic; no HTTP, no SQL
-  routes/               18 endpoints; no business logic
+  routes/               28 paths, 30 operations; no business logic
   workers/              RQ tasks and the two pipelines
 frontend/src/
   features/<Screen>/    <Screen>Page.tsx (UI) + use<Screen>.ts (all logic)
@@ -178,21 +182,29 @@ All ten SRS screens are built. Every backend pipeline module exists and is teste
 | Area | State |
 |---|---|
 | Frontend | ✅ 10/10 screens + attribution drawer |
-| API | ✅ 20 endpoints, one error envelope, OpenAPI at `/api/docs` |
+| API | ✅ 28 paths / 30 operations, one error envelope, OpenAPI at `/api/docs` |
 | Persistence | ✅ 13 tables, PostGIS, Alembic baseline |
 | Pipeline | ✅ geo, ml, optimizer, agent, report — all wired into the workers |
-| FortyGuard | ✅ live API verified end to end; 14 recorded Phoenix responses committed |
+| FortyGuard | ✅ live API verified end to end; 45 recorded responses committed across six AOIs |
+| Model | ✅ trained on 3 harvested districts, 11/13 features live — metrics below, and they are not flattering |
 | Deployment | ✅ Makefile, both Dockerfiles, compose, CI |
-| Tests | ✅ 559 backend — 522 pass, 38 skip without Postgres/Redis, 0 fail; `tsc` clean |
+| Tests | ✅ 742 backend — all pass with Postgres/Redis; 700 pass and 42 skip without them, 0 fail; `tsc` clean; `ruff check` clean |
 
 ### What needs data, not code
 
 Two things cannot be resolved by writing code, and both are deliberate:
 
-**Intervention catalog.** `backend/data/interventions_catalog.csv` currently holds
-**one fully-sourced row** — street trees, with the cost from NYC Parks FY2024 and the
-effect range from Locke et al. 2024 in *Heliyon*. Both were confirmed by reading the
-source, not a search summary.
+**Intervention catalog.** `backend/data/interventions_catalog.csv` holds **two
+fully-sourced rows** — street trees, with the cost from NYC Parks FY2024 and the
+effect range from Locke et al. 2024 in *Heliyon*; and a white PVC cool-roof
+membrane, costed from the US EPA cool-roof compendium with the effect range from
+Brousse et al. 2024. Each carries its assumptions and, where one exists, its
+provenance caveat in the row itself.
+
+`shade` and `water` are absent by decision rather than omission: a tile is
+100 m × 100 m, and neither a bus shelter nor a misting installation changes air
+temperature over a hectare. The reasoning is in
+[`backend/data/CATALOG-RESEARCH.md`](backend/data/CATALOG-RESEARCH.md).
 
 Candidate rows whose cost is sourced but whose effect size is not yet confirmed are
 held in [`backend/data/CATALOG-RESEARCH.md`](backend/data/CATALOG-RESEARCH.md) rather
@@ -218,15 +230,35 @@ make fixtures-plan DISTRICT=lasvegas   # free — prints the plan
 make fixtures DISTRICT=lasvegas        # spends 14 credits
 ```
 
-**Model training is still blocked, deliberately.** `python -m scripts.train_model
---check` reports why: a grouped holdout needs two or more districts, and 10 of the
-13 features need the NLCD, terrain and census providers that are not written yet.
-The script refuses rather than producing a model whose metrics overstate it.
+**The model is trained, and its metrics do not flatter it.** `scripts/train_model`
+now passes its own readiness gate: three harvested districts, and 11 of the 13
+features resolving from NLCD, USGS 3DEP, NHD-derived land cover and ACS. It fits
+LightGBM quantile models at p10/p50/p90 on `phoenix_city` and `lasvegas_city`
+(23,192 tiles) and holds out `tucson_city` (11,448).
 
-**The US Census API now requires a key.** SRS §12.2 assumed it was open; as of
+What it reports, unedited:
+
+| | |
+|---|---|
+| MAE | 0.273 °C |
+| R² on held-out ground | **−0.009** |
+| Interval coverage | 0.930 against a nominal 0.80 — conservative, not calibrated |
+| Held-out refusal rate | **100%** — every held-out tile falls outside the training support and is refused rather than extrapolated |
+| Features null | `albedo_proxy`, `openness_proxy` — neither has a citable source |
+
+An R² at zero means the model does not transfer between cities on two cities'
+worth of training data, and the refusal rate says the same thing from the other
+side. Both are published on the Methods page and in the PDF rather than buried,
+and both are the reason ΔT in a plan comes from the catalog's **cited effect
+range** rather than from the model. Retraining is reproducible offline from the
+committed feature cache: `python -m scripts.train_model` reproduces the shipped
+artefacts byte for byte.
+
+**The US Census API requires a key.** SRS §12.2 assumed it was open; as of
 2026-08-18 an unauthenticated ACS request returns a "Missing Key" page. A free key
-from <https://api.census.gov/data/key_signup.html> is needed before the population
-and vulnerability features can be built.
+from <https://api.census.gov/data/key_signup.html> goes in `CENSUS_API_KEY`.
+Without it the population, age and poverty features report null rather than
+refusing to start.
 
 ---
 

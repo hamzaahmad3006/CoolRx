@@ -33,8 +33,8 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from datetime import datetime, timezone
 from collections import defaultdict
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -45,7 +45,6 @@ from clients.fortyguard.parsing import parse_heatmap
 from core.config import get_settings
 from geo import default_providers
 from geo.providers import UnavailableProvider
-from scripts._enrichment_cache import enriched_rows
 from ml.features import FEATURE_ORDER
 from ml.model import (
     TemperatureModel,
@@ -54,6 +53,7 @@ from ml.model import (
     mean_absolute_error,
     r_squared,
 )
+from scripts._enrichment_cache import enriched_rows
 
 log = structlog.get_logger(__name__)
 
@@ -140,9 +140,7 @@ def _load_tcm_fixtures(fixture_dir: Path) -> dict[str, list[Any]]:
     return dict(by_district)
 
 
-def _prefer_city_scale(
-    by_district: dict[str, list[Any]]
-) -> dict[str, list[Any]]:
+def _prefer_city_scale(by_district: dict[str, list[Any]]) -> dict[str, list[Any]]:
     """Drop a small district capture when its city-scale version exists.
 
     The small AOIs sit *inside* the city ones -- `phoenix` is 3 sq mi of the
@@ -158,11 +156,7 @@ def _prefer_city_scale(
     """
     city_keys = {k for k in by_district if k.endswith("_city")}
     superseded = {k[: -len("_city")] for k in city_keys}
-    return {
-        key: tiles
-        for key, tiles in by_district.items()
-        if key not in superseded
-    }
+    return {key: tiles for key, tiles in by_district.items() if key not in superseded}
 
 
 def readiness(fixture_dir: Path) -> dict[str, Any]:
@@ -192,9 +186,7 @@ def readiness(fixture_dir: Path) -> dict[str, Any]:
         "features_resolvable": resolvable,
         "features_missing": missing,
         "grouped_holdout_possible": len(by_district) >= MIN_DISTRICTS_FOR_HOLDOUT,
-        "feature_vector_complete": not [
-            f for f in missing if f not in KNOWN_UNSOURCED
-        ],
+        "feature_vector_complete": not [f for f in missing if f not in KNOWN_UNSOURCED],
         "features_unsourced": [f for f in missing if f in KNOWN_UNSOURCED],
     }
 
@@ -204,15 +196,15 @@ def _explain(state: dict[str, Any]) -> list[str]:
     if not state["grouped_holdout_possible"]:
         problems.append(
             f"Grouped holdout needs {MIN_DISTRICTS_FOR_HOLDOUT}+ districts; "
-            f"{state['district_count']} harvested ({', '.join(state['districts']) or 'none'}). "
+            f"{state['district_count']} harvested "
+            f"({', '.join(state['districts']) or 'none'}). "
             "Run: make fixtures DISTRICT=lasvegas"
         )
     if not state["feature_vector_complete"]:
+        unsourced = [f for f in state["features_missing"] if f not in KNOWN_UNSOURCED]
         problems.append(
-            f"{len([f for f in state['features_missing'] if f not in KNOWN_UNSOURCED])} "
-            f"of {state['features_total']} features have a provider that is not "
-            f"answering: "
-            f"{', '.join(f for f in state['features_missing'] if f not in KNOWN_UNSOURCED)}. "
+            f"{len(unsourced)} of {state['features_total']} features have a "
+            f"provider that is not answering: {', '.join(unsourced)}. "
             "Neither has a citable source: albedo needs a per-class reflectance "
             "table, openness needs building heights."
         )
@@ -263,7 +255,9 @@ def train(*, allow_thin: bool, model_dir: Path, fixture_dir: Path) -> int:
         tiles = by_district[district]
         print(f"  enriching {district} ({len(tiles)} labelled tiles) ...", flush=True)
         rows, labels, district_mean = enriched_rows(
-            district, tiles, feature_dir,
+            district,
+            tiles,
+            feature_dir,
             census_api_key=settings.census_api_key,
         )
         if district_mean is None:
@@ -372,9 +366,7 @@ def train(*, allow_thin: bool, model_dir: Path, fixture_dir: Path) -> int:
     # and the production refusal rate is reported next to them rather than
     # hidden by them.
     refused = sum(1 for pred in model.predict_batch(test_rows) if pred is None)
-    predictions = [
-        model.predict(row, enforce_support=False) for row in test_rows
-    ]
+    predictions = [model.predict(row, enforce_support=False) for row in test_rows]
 
     eval_labels = list(test_labels)
 
@@ -400,7 +392,7 @@ def train(*, allow_thin: bool, model_dir: Path, fixture_dir: Path) -> int:
 
     metrics = {
         "model_version": report.model_version,
-        "trained_at": datetime.now(timezone.utc).isoformat(),
+        "trained_at": datetime.now(UTC).isoformat(),
         "honest": not problems,
         "training_rows": report.training_rows,
         "held_out_rows": report.held_out_rows,
@@ -463,7 +455,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--allow-thin-features",
         action="store_true",
-        help="train despite an incomplete feature vector; output is marked honest=false",
+        help=(
+            "train despite an incomplete feature vector; "
+            "output is marked honest=false"
+        ),
     )
     args = parser.parse_args(argv)
 

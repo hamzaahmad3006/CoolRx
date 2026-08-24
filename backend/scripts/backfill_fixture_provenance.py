@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -41,7 +41,9 @@ def _expected() -> dict[str, dict[str, Any]]:
     table: dict[str, dict[str, Any]] = {}
 
     for key, district in DISTRICTS.items():
-        calls = _plan(district, settings.fg_default_granularity, settings.fg_ladder_steps)
+        calls = _plan(
+            district, settings.fg_default_granularity, settings.fg_ladder_steps
+        )
         for analytic, threshold in calls:
             payload = _payload(
                 district,
@@ -61,7 +63,7 @@ def _expected() -> dict[str, dict[str, Any]]:
                 # Never observed for these recordings; not invented.
                 "activity_id": None,
                 "provenance_backfilled": True,
-                "backfilled_at": datetime.now(timezone.utc).isoformat(),
+                "backfilled_at": datetime.now(UTC).isoformat(),
             }
     return table
 
@@ -105,8 +107,10 @@ def main(argv: list[str] | None = None) -> int:
         upgraded += 1
         label = f"{meta['district']}/{meta['analytic_type']}"
         thr = meta["threshold_c"]
-        print(f"  [{'would fix' if args.dry_run else '     fixed'}] {label}"
-              f"{f' @ {thr}' if thr is not None else ''}")
+        print(
+            f"  [{'would fix' if args.dry_run else '     fixed'}] {label}"
+            f"{f' @ {thr}' if thr is not None else ''}"
+        )
 
     print(
         f"\n  {upgraded} upgraded, {already} already had provenance, "

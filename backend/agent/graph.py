@@ -32,7 +32,7 @@ import structlog
 
 from schemas.agent import AgentNodeRecord, GuardVerdict, GuardViolation
 
-from .llm import LlmClient, SYSTEM_PROMPT, rationale_prompt, summary_prompt
+from .llm import SYSTEM_PROMPT, LlmClient, rationale_prompt, summary_prompt
 from .numeric_guard import (
     NUMBER_FREE_RATIONALE,
     AllowedNumerals,

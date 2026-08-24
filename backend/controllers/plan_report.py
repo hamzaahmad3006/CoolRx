@@ -24,9 +24,9 @@ from sqlalchemy.orm import Session
 
 from controllers.catalog import CatalogController
 from core.config import get_settings
+from report.pdf import Figure, ReportData, ReportItem, build_report
 from repositories.plans import PlanRepository
 from repositories.tables import AnalyticRun, FgRequest, Project
-from report.pdf import Figure, ReportData, ReportItem, build_report
 from schemas.common import ESTIMATE_DISCLAIMER, VERIFICATION_CAVEAT
 
 log = structlog.get_logger(__name__)
@@ -229,7 +229,7 @@ def build_plan_report(session: Session, plan_id: uuid.UUID) -> tuple[bytes, str]
 
     try:
         pdf = build_report(data)
-    except Exception as exc:  # noqa: BLE001 — surfaced, never a blank file
+    except Exception as exc:  # surfaced, never a blank file
         log.warning("report.build_failed", plan_id=str(plan_id), detail=str(exc))
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

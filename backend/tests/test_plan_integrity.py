@@ -178,7 +178,7 @@ def test_total_cost_is_recomputed_from_items() -> None:
         _item(cost_usd=D("400.25"), rank=3),
     ]
     plan = _create(session, budget_usd=D("10000.00"), items=items)
-    assert getattr(plan, "total_cost_usd") == D("3900.75")
+    assert plan.total_cost_usd == D("3900.75")
 
 
 @pytest.mark.parametrize("budget", ["0", "-1", "-1000.00"])
@@ -253,7 +253,7 @@ def test_plan_mean_is_not_derived_from_item_means() -> None:
             mean_delta_c_high=D("-0.50"),
         ),
     )
-    assert getattr(plan, "mean_delta_c") == D("-0.80")
+    assert plan.mean_delta_c == D("-0.80")
 
 
 def test_cost_tolerance_is_sub_dollar() -> None:

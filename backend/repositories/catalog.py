@@ -21,13 +21,12 @@ defaults would defeat the entire citation chain.
 
 from __future__ import annotations
 
-import json
-
 import csv
+import json
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 
 import structlog
 from sqlalchemy import delete, func, select
@@ -75,7 +74,9 @@ class RowViolation:
     reason: str
 
     def __str__(self) -> str:
-        return f"row {self.row_number} ({self.code or '?'}): {self.field} — {self.reason}"
+        return (
+            f"row {self.row_number} ({self.code or '?'}): {self.field} — {self.reason}"
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -142,7 +143,9 @@ def validate_row(
     if high is None:
         fail("delta_c_high", "must be a number")
     if low is not None and high is not None and low >= high:
-        fail("delta_c_low", f"must be strictly less than delta_c_high ({low} >= {high})")
+        fail(
+            "delta_c_low", f"must be strictly less than delta_c_high ({low} >= {high})"
+        )
 
     maintenance = _decimal(raw.get("maintenance_usd_yr", ""))
     if maintenance is None:
@@ -273,11 +276,13 @@ def load_catalog(session: Session, path: Path, *, strict: bool = True) -> int:
     if violations and strict:
         detail = "\n  ".join(str(v) for v in violations)
         raise CatalogError(
-            f"catalog validation failed with {len(violations)} violation(s):\n  {detail}"
+            f"catalog validation failed with {len(violations)} "
+            f"violation(s):\n  {detail}"
         )
     if violations:
         log.warning(
-            "catalog.rows_rejected", count=len(violations),
+            "catalog.rows_rejected",
+            count=len(violations),
             violations=[str(v) for v in violations],
         )
 
@@ -314,20 +319,26 @@ def assert_catalog_ready(session: Session) -> int:
     Checks the database rather than the CSV, because the database is what the
     optimizer reads — a valid CSV that was never loaded is still a broken app.
     """
-    total = int(session.execute(
-        select(func.count()).select_from(InterventionCatalogEntry)
-    ).scalar_one())
+    total = int(
+        session.execute(
+            select(func.count()).select_from(InterventionCatalogEntry)
+        ).scalar_one()
+    )
     if total == 0:
         raise CatalogError(
             "intervention catalog is empty. Run the catalog loader before serving "
             "traffic; the optimizer and every cost figure depend on it."
         )
 
-    uncited = int(session.execute(
-        select(func.count())
-        .select_from(InterventionCatalogEntry)
-        .where(func.length(func.trim(InterventionCatalogEntry.source_citation)) == 0)
-    ).scalar_one())
+    uncited = int(
+        session.execute(
+            select(func.count())
+            .select_from(InterventionCatalogEntry)
+            .where(
+                func.length(func.trim(InterventionCatalogEntry.source_citation)) == 0
+            )
+        ).scalar_one()
+    )
     if uncited:
         raise CatalogError(
             f"{uncited} catalog row(s) have no source_citation. Refusing to start: "

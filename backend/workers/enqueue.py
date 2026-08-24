@@ -50,7 +50,7 @@ def enqueue_diagnose(
             # A UUID satisfies that rule; the separator did not.
             job_id=f"diagnose-{job_id}",
         )
-    except Exception as exc:  # noqa: BLE001 — surfaced as EnqueueFailed
+    except Exception as exc:  # surfaced as EnqueueFailed
         log.error("enqueue.failed", kind="diagnose", detail=str(exc))
         raise EnqueueFailed(str(exc)) from exc
 
@@ -81,7 +81,7 @@ def enqueue_plan(
             threshold_c,
             job_id=f"plan-{job_id}",
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         log.error("enqueue.failed", kind="plan", detail=str(exc))
         raise EnqueueFailed(str(exc)) from exc
 

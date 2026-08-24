@@ -123,7 +123,7 @@ def model_validation(settings: SettingsDep) -> ModelValidationResponse:
     response_model=CreditStatusResponse,
     summary="FortyGuard credit budget",
 )
-def credits(settings: SettingsDep) -> CreditStatusResponse:
+def credit_status(settings: SettingsDep) -> CreditStatusResponse:
     """Remaining budget, or an honest null.
 
     FortyGuard publishes no balance endpoint, so `remaining` is null rather than

@@ -11,8 +11,9 @@ survive into it, rather than eyeballing layout.
 
 from __future__ import annotations
 
-import re
 import base64
+import contextlib
+import re
 import zlib
 from datetime import UTC, datetime
 
@@ -36,7 +37,9 @@ CAVEAT = (
 )
 
 
-def _figure(label: str = "Mean cooling", value: str = "-2.3 °C (-3.0 to -1.6)") -> Figure:
+def _figure(
+    label: str = "Mean cooling", value: str = "-2.3 °C (-3.0 to -1.6)"
+) -> Figure:
     return Figure(
         label=label,
         value=value,
@@ -101,21 +104,19 @@ def _pdf_text(payload: bytes) -> str:
     for match in re.finditer(rb"stream\r?\n(.*?)endstream", payload, re.DOTALL):
         raw = match.group(1).strip()
 
-        try:
+        with contextlib.suppress(ValueError):
             raw = base64.a85decode(raw, adobe=True)
-        except ValueError:
-            pass
-        try:
+        with contextlib.suppress(zlib.error):
             raw = zlib.decompress(raw)
-        except zlib.error:
-            pass
 
         chunks.append(raw.decode("latin-1", errors="ignore"))
 
     body = "\n".join(chunks)
     # `(text) Tj` for single strings, and the string parts of `[...] TJ` arrays.
     pieces = re.findall(r"\((?:\\.|[^\\()])*\)", body)
-    return " ".join(piece[1:-1].replace("\\(", "(").replace("\\)", ")") for piece in pieces)
+    return " ".join(
+        piece[1:-1].replace("\\(", "(").replace("\\)", ")") for piece in pieces
+    )
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -212,16 +213,22 @@ def test_the_footer_states_the_document_is_not_measurements(
 def test_dropped_rationales_are_explained_not_omitted() -> None:
     """An unexplained gap looks like a bug; the real reason is the guard firing."""
     payload = build_report(
-        _data(items=[_item(1), ReportItem(
-            rank=2,
-            tile_key="9tbq2p60m",
-            intervention_name="Cool roof coating",
-            quantity="400 m2",
-            cost="$12,000",
-            predicted_delta="-0.9 °C (-1.4 to -0.4)",
-            hours_avoided="120 h",
-            rationale=None,
-        )], rationales_dropped=1)
+        _data(
+            items=[
+                _item(1),
+                ReportItem(
+                    rank=2,
+                    tile_key="9tbq2p60m",
+                    intervention_name="Cool roof coating",
+                    quantity="400 m2",
+                    cost="$12,000",
+                    predicted_delta="-0.9 °C (-1.4 to -0.4)",
+                    hours_avoided="120 h",
+                    rationale=None,
+                ),
+            ],
+            rationales_dropped=1,
+        )
     )
     text = _pdf_text(payload)
     assert "numeric check rejected" in text
@@ -274,7 +281,7 @@ def test_every_page_carries_the_required_attribution() -> None:
         ):
             try:
                 return decode(raw)
-            except Exception:  # noqa: BLE001 - try the next encoding
+            except Exception:  # noqa: BLE001, S112 — try the next encoding; not logged, because these loops run over thousands of upstream records and a line per skip would drown the run
                 continue
         return b""
 

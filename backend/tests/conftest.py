@@ -42,7 +42,7 @@ os.environ["ANTHROPIC_API_KEY"] = ""
 os.environ["GROQ_API_KEY"] = ""
 os.environ["LLM_PROVIDER"] = "none"
 
-import pytest  # noqa: E402  — must follow the environment pin above
+import pytest
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -110,7 +110,7 @@ def _services_up() -> tuple[bool, str]:
     return True, ""
 
 
-def pytest_collection_modifyitems(config, items) -> None:  # noqa: ANN001
+def pytest_collection_modifyitems(config, items) -> None:
     del config
     if not any(
         any(m in item.nodeid for m in _SERVICE_MODULES) for item in items

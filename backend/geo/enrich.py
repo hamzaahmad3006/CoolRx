@@ -25,7 +25,6 @@ import structlog
 from .grid import Tile
 from .providers import (
     ENRICHABLE_FIELDS,
-    REQUIRED_FEATURE_FIELDS,
     FeatureProvider,
     ProviderInfo,
     ProviderResult,

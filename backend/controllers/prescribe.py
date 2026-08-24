@@ -93,8 +93,7 @@ class PrescribeController:
             )
             raise UpstreamUnavailableError(
                 message=(
-                    "The analysis queue is unavailable, so this plan was not "
-                    "generated."
+                    "The analysis queue is unavailable, so this plan was not generated."
                 ),
                 details={"jobId": str(job.id), "reason": type(exc).__name__},
             ) from exc
@@ -135,9 +134,7 @@ class PrescribeController:
 
         catalog_by_code = {
             row.code: row
-            for row in self._session.execute(
-                select(InterventionCatalogEntry)
-            ).scalars()
+            for row in self._session.execute(select(InterventionCatalogEntry)).scalars()
         }
         return plan_to_response(
             plan,
@@ -225,7 +222,9 @@ class PrescribeController:
         """
         rows = list(
             self._session.execute(
-                select(Exposure.tile_key, Exposure.population, Exposure.svi_score).where(
+                select(
+                    Exposure.tile_key, Exposure.population, Exposure.svi_score
+                ).where(
                     Exposure.project_id == project_id,
                     Exposure.svi_score.is_not(None),
                     Exposure.population.is_not(None),

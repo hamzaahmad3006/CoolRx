@@ -48,9 +48,7 @@ class ProjectRepository:
         `validation.geodesic_area_sqmi`, and recomputing it with a different
         method here could accept an AOI the validator rejected.
         """
-        geometry = func.ST_SetSRID(
-            ST_GeomFromGeoJSON(json.dumps(aoi_geojson)), SRID
-        )
+        geometry = func.ST_SetSRID(ST_GeomFromGeoJSON(json.dumps(aoi_geojson)), SRID)
         project = Project(
             name=name,
             city=city,
@@ -93,7 +91,9 @@ class ProjectRepository:
         parsed: dict[str, Any] = json.loads(row[0])
         return parsed
 
-    def aoi_bounds(self, project_id: uuid.UUID) -> tuple[float, float, float, float] | None:
+    def aoi_bounds(
+        self, project_id: uuid.UUID
+    ) -> tuple[float, float, float, float] | None:
         """Return (west, south, east, north).
 
         Used to build FortyGuard requests, which take a bounding box rather than

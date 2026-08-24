@@ -50,9 +50,7 @@ def client() -> Iterator[TestClient]:
         yield test_client
 
 
-def _box(
-    *, west: float, south: float, east: float, north: float
-) -> dict[str, object]:
+def _box(*, west: float, south: float, east: float, north: float) -> dict[str, object]:
     """A closed rectangular AOI. Positions are [lon, lat]."""
     return {
         "type": "FeatureCollection",
@@ -175,7 +173,9 @@ def test_multi_feature_aoi_is_rejected(client: TestClient) -> None:
     two = _box(west=-112.10, south=33.43, east=-112.07, north=33.455)
     two["features"] = two["features"] * 2  # type: ignore[index,operator]
 
-    assert client.post("/api/projects/validate-aoi", json={"aoi": two}).status_code == 422
+    assert (
+        client.post("/api/projects/validate-aoi", json={"aoi": two}).status_code == 422
+    )
 
 
 def test_missing_body_is_a_422_envelope(client: TestClient) -> None:

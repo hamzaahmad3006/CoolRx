@@ -107,9 +107,7 @@ _RULE_KEYS = frozenset(
 )
 
 
-def check_feasibility(
-    entry: CatalogEntryLike, tile: TileContext
-) -> str | None:
+def check_feasibility(entry: CatalogEntryLike, tile: TileContext) -> str | None:
     """Return the reason this intervention cannot go here, or None if it can.
 
     A rule whose tile feature is **unmeasured** does not block the candidate. The
@@ -148,9 +146,13 @@ def check_feasibility(
             continue  # Unmeasured does not mean unsuitable.
 
         if key.startswith("max_") and value > limit:
-            return f"{feature.replace('_', ' ')} is {value:g}, above the {limit:g} limit"
+            return (
+                f"{feature.replace('_', ' ')} is {value:g}, above the {limit:g} limit"
+            )
         if key.startswith("min_") and value < limit:
-            return f"{feature.replace('_', ' ')} is {value:g}, below the {limit:g} minimum"
+            return (
+                f"{feature.replace('_', ' ')} is {value:g}, below the {limit:g} minimum"
+            )
 
     return None
 
@@ -168,9 +170,7 @@ class DeltaEstimator(ABC):
     def name(self) -> str: ...
 
     @abstractmethod
-    def estimate(
-        self, entry: CatalogEntryLike, tile: TileContext
-    ) -> DeltaEstimate: ...
+    def estimate(self, entry: CatalogEntryLike, tile: TileContext) -> DeltaEstimate: ...
 
 
 class CatalogDeltaEstimator(DeltaEstimator):
@@ -197,9 +197,7 @@ class CatalogDeltaEstimator(DeltaEstimator):
         )
 
 
-def clamp_to_catalog(
-    estimate: DeltaEstimate, entry: CatalogEntryLike
-) -> DeltaEstimate:
+def clamp_to_catalog(estimate: DeltaEstimate, entry: CatalogEntryLike) -> DeltaEstimate:
     """Force an estimate inside the intervention's cited range.
 
     The last line of defence on ΔT (SRS §9.3.2). Whatever a model predicts, a

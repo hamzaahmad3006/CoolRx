@@ -80,7 +80,6 @@ def request(
     kwargs.setdefault("follow_redirects", True)
 
     delay = backoff_s
-    last_exc: Exception | None = None
 
     for attempt in range(1, attempts + 1):
         try:
@@ -100,7 +99,6 @@ def request(
             pass
 
         except (httpx.TimeoutException, httpx.TransportError) as exc:
-            last_exc = exc
             if attempt >= attempts:
                 log.warning(
                     "geo.http_exhausted",

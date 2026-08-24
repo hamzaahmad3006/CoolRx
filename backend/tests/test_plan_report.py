@@ -100,8 +100,9 @@ def test_the_citation_is_reproduced_verbatim() -> None:
     """Summarising a citation makes it a paraphrase of a source the reader can no
     longer check. Extracted rather than searched as raw bytes: reportlab
     compresses its content streams."""
-    from pypdf import PdfReader
     from io import BytesIO
+
+    from pypdf import PdfReader
 
     citation = (
         "Brousse O, Simpson C. Cool Roofs. Geophysical Research Letters 2024; "
@@ -117,8 +118,9 @@ def test_the_citation_is_reproduced_verbatim() -> None:
 def test_limitations_reach_the_document() -> None:
     """A PDF carrying gentler caveats than the website is worse than one carrying
     none, because it looks as though it was checked."""
-    from pypdf import PdfReader
     from io import BytesIO
+
+    from pypdf import PdfReader
 
     pdf = build_report(
         _data(limitations=["Predicted cooling for a material intervention is zero."])
@@ -132,8 +134,9 @@ def test_limitations_reach_the_document() -> None:
 def test_every_predicted_value_carries_its_interval() -> None:
     """There is no code path that renders a bare point estimate, so the item's
     delta string is passed through with its bounds already attached."""
-    from pypdf import PdfReader
     from io import BytesIO
+
+    from pypdf import PdfReader
 
     pdf = build_report(_data())
     text = "\n".join(

@@ -171,7 +171,9 @@ def test_transition_on_missing_job_returns_false() -> None:
 # ── Stage tables ────────────────────────────────────────────────────────────
 
 
-@pytest.mark.parametrize(("name", "stages"), [("diagnose", DIAGNOSE_STAGES), ("plan", PLAN_STAGES)])
+@pytest.mark.parametrize(
+    ("name", "stages"), [("diagnose", DIAGNOSE_STAGES), ("plan", PLAN_STAGES)]
+)
 def test_stage_tables_are_monotonic_and_end_at_100(
     name: str, stages: tuple[tuple[str, int], ...]
 ) -> None:

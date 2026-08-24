@@ -221,9 +221,21 @@ cd /d/CoolRx/backend
 ./.venv/Scripts/python.exe -m pytest
 ```
 
-**739 passed, 0 skipped** with Postgres and Redis up. Skips mean the services are
-not running — `conftest.py` probes the ports and skips rather than failing, so a
-green run with 42 skips is not the same as a green run.
+**742 passed, 0 skipped** with Postgres and Redis up — and only if the database has
+been migrated and the catalog loaded, which is what the two commands in step 2 do.
+Skips mean the services are not running: `conftest.py` probes the ports and skips
+rather than failing, so a green run with 42 skips is not the same as a green run.
+
+Also worth running once, because the container and CI use 3.12 while this machine
+has 3.14, and the two are not interchangeable:
+
+```bash
+cd /d/CoolRx/backend
+./.venv/Scripts/python.exe -m ruff check .
+```
+
+Clean. A finding here fails CI's backend job outright — it is not
+`continue-on-error`, unlike mypy beside it.
 
 ```bash
 cd /d/CoolRx/frontend

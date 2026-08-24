@@ -20,6 +20,7 @@ from decimal import Decimal
 from typing import Any
 
 from clients.fortyguard import models as fg
+from clients.fortyguard.parsing import read_stat
 from repositories.tables import (
     AgentRun,
     AnalyticRun,
@@ -30,6 +31,8 @@ from repositories.tables import (
     Plan,
     PlanItem,
     Project,
+)
+from repositories.tables import (
     TileFeature as TileFeatureRow,
 )
 from schemas.agent import AgentNodeRecord, AgentRunResponse, GuardViolation
@@ -145,6 +148,53 @@ def project_to_response(
     )
 
 
+def stats_of_run(run: AnalyticRun) -> FgStats:
+    """The run's statistics, whichever of the two shapes the API sent.
+
+    `stats_data` is not one shape. The temperature field nests its figures under
+    `stats_data.temperature_stats` and names them `minimum` / `maximum` /
+    `standard_deviation`; exceedance, persistence and time-of-measure send a flat
+    block keyed `min` / `max` / `mean` with `n_cells` and `units` beside them.
+
+    Validating the stored blob straight into the flat model handled the second
+    shape and returned an all-null block for the first -- so every `tcm` run, the
+    one the whole diagnosis is about, published empty statistics while the
+    exceedance runs listed beside it looked correct. Nothing raised, because every
+    field on `FgStats` is legitimately optional.
+
+    So: `read_stat` first, which knows the nested block and both its spellings,
+    then the flat short keys. Reading both is not guessing -- each is an observed
+    response shape, recorded in `data/fixtures/`.
+
+    `median` is not published in either shape and stays null rather than being
+    approximated from the mean.
+    """
+    raw: dict[str, Any] = {"stats_data": run.stats or {}}
+    block = run.stats or {}
+
+    def read(name: str) -> float | None:
+        value = read_stat(raw, name)
+        if value is not None:
+            return value
+        flat = block.get(name)
+        if isinstance(flat, (int, float)) and not isinstance(flat, bool):
+            return float(flat)
+        return None
+
+    cells = block.get("n_cells")
+    counted = isinstance(cells, int) and not isinstance(cells, bool)
+    return FgStats(
+        min=read("min"),
+        max=read("max"),
+        mean=read("mean"),
+        median=None,
+        std=read("std"),
+        # The API's own cell count where it sends one; never a substitute for it.
+        count=int(cells) if counted else None,
+        units=run.units,
+    )
+
+
 def analytic_run_to_response(
     run: AnalyticRun, activity_id: str | None
 ) -> AnalyticRunResponse:
@@ -159,7 +209,7 @@ def analytic_run_to_response(
         start_time=run.start_time.strftime("%H:%M") if run.start_time else None,
         filter_type=run.filter_type,  # type: ignore[arg-type]
         units=run.units,
-        stats=FgStats.model_validate(run.stats or {}),
+        stats=stats_of_run(run),
         activity_id=activity_id,
         created_at=run.created_at,
     )

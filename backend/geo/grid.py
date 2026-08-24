@@ -125,8 +125,12 @@ def build_grid(
             using_epsg=epsg,
         )
 
-    to_utm = Transformer.from_crs(CRS.from_epsg(4326), CRS.from_epsg(epsg), always_xy=True)
-    to_wgs = Transformer.from_crs(CRS.from_epsg(epsg), CRS.from_epsg(4326), always_xy=True)
+    to_utm = Transformer.from_crs(
+        CRS.from_epsg(4326), CRS.from_epsg(epsg), always_xy=True
+    )
+    to_wgs = Transformer.from_crs(
+        CRS.from_epsg(epsg), CRS.from_epsg(4326), always_xy=True
+    )
 
     # Project all four corners, not two. A UTM grid is not axis-aligned with a
     # lat/lon box, so using only the SW and NE corners would clip the two corners
@@ -214,9 +218,7 @@ def _emit_tiles(
             lons = (sw[0], se[0], ne[0], nw[0])
             lats = (sw[1], se[1], ne[1], nw[1])
 
-            centre_lon, centre_lat = to_wgs.transform(
-                x0 + step / 2.0, y0 + step / 2.0
-            )
+            centre_lon, centre_lat = to_wgs.transform(x0 + step / 2.0, y0 + step / 2.0)
 
             yield Tile(
                 tile_key=tile_key(centre_lon, centre_lat),

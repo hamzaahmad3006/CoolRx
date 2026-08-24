@@ -142,7 +142,6 @@ class ElevationProvider(FeatureProvider):
         self, west: float, south: float, east: float, north: float
     ) -> tuple[Any, Any]:
         """One exportImage covering the AOI, as float32 GeoTIFF."""
-        import httpx
         import rasterio
 
         cell_deg = DEM_RESOLUTION_M * _DEG_PER_M

@@ -21,16 +21,11 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from clients.fortyguard.parsing import read_stat
-from ml.counterfactual import apply_transform, transform_for_category
-from ml.model import ModelNotTrained, OutOfSupport, TemperatureModel
 from repositories.plans import PlanRepository
 from repositories.tables import (
     AnalyticRun,
     Attribution,
-    InterventionCatalogEntry,
     Plan,
-    Tile,
     TileFeature,
 )
 from repositories.tiles import TileRepository
@@ -133,8 +128,7 @@ class PlanViewsController:
             )
 
         geojson = {
-            str(item["id"]): item
-            for item in self._tiles.tile_geojson_for_run(run.id)
+            str(item["id"]): item for item in self._tiles.tile_geojson_for_run(run.id)
         }
 
         out: list[TileFeatureSchema] = []
@@ -275,11 +269,15 @@ class PlanViewsController:
                 )
             )
 
-        attribution = self._session.execute(
-            select(Attribution)
-            .where(Attribution.project_id == plan.project_id)
-            .limit(1)
-        ).scalars().first()
+        attribution = (
+            self._session.execute(
+                select(Attribution)
+                .where(Attribution.project_id == plan.project_id)
+                .limit(1)
+            )
+            .scalars()
+            .first()
+        )
         if attribution is not None:
             records.append(
                 ProvenanceRecord(
@@ -317,9 +315,7 @@ class PlanViewsController:
 
     # ── verification protocol ────────────────────────────────────────────────
 
-    def verification_protocol(
-        self, plan_id: uuid.UUID
-    ) -> VerificationProtocolResponse:
+    def verification_protocol(self, plan_id: uuid.UUID) -> VerificationProtocolResponse:
         """The measurement plan, issued before any follow-up exists.
 
         Naming the treated and control tiles in advance is the whole point: chosen
@@ -330,7 +326,10 @@ class PlanViewsController:
         if not items:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"Plan {plan_id} treats no tiles, so there is nothing to verify.",
+                detail=(
+                    f"Plan {plan_id} treats no tiles, "
+                    "so there is nothing to verify."
+                ),
             )
 
         treated = sorted({item.tile_key for item in items})
@@ -397,10 +396,9 @@ class PlanViewsController:
                 continue
             # Scaled so a degree and a percentage point are not summed as if
             # they were the same quantity.
-            distance = (
-                ((float(base) - mean_base) / 0.5) ** 2
-                + ((float(impervious) - mean_imp) / 10.0) ** 2
-            )
+            distance = ((float(base) - mean_base) / 0.5) ** 2 + (
+                (float(impervious) - mean_imp) / 10.0
+            ) ** 2
             scored.append((distance, key))
 
         scored.sort()
