@@ -151,7 +151,9 @@ class AnalyticRun(Base):
 
     id: Mapped[uuid.UUID] = _uuid_pk()
     project_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+        UUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
     )
     fg_request_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("fg_requests.id"), nullable=False
@@ -202,7 +204,9 @@ class Tile(Base):
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     project_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+        UUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
     )
     analytic_run_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -357,7 +361,9 @@ class Plan(Base):
 
     id: Mapped[uuid.UUID] = _uuid_pk()
     project_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
+        UUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
     )
     budget_usd: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
     objective: Mapped[str] = mapped_column(Text, nullable=False)

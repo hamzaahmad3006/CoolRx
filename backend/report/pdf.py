@@ -30,7 +30,7 @@ import structlog
 log = structlog.get_logger(__name__)
 
 # ── Page geometry, in points (72 per inch) ───────────────────────────────────
-PAGE_WIDTH: Final[float] = 595.27   # A4
+PAGE_WIDTH: Final[float] = 595.27  # A4
 PAGE_HEIGHT: Final[float] = 841.89
 MARGIN: Final[float] = 56.0
 CONTENT_WIDTH: Final[float] = PAGE_WIDTH - 2 * MARGIN
@@ -46,9 +46,7 @@ LEADING: Final[float] = 13.0
 #: the same string via BRAND.attribution; this is the other half of AC-21. It sits
 #: in the footer rather than a credits page so it cannot be lost by printing or
 #: sharing a single sheet.
-ATTRIBUTION: Final[str] = (
-    "© OpenStreetMap contributors · Temperature data © FortyGuard"
-)
+ATTRIBUTION: Final[str] = "© OpenStreetMap contributors · Temperature data © FortyGuard"
 
 INK = (0.09, 0.09, 0.10)
 MUTED = (0.42, 0.43, 0.45)
@@ -106,9 +104,7 @@ class ReportData:
     #: Count of items whose rationale the guard rejected.
     rationales_dropped: int = 0
     equity_note: str | None = None
-    generated_at: datetime = field(
-        default_factory=lambda: datetime.now(UTC)
-    )
+    generated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 def build_report(data: ReportData) -> bytes:
@@ -257,7 +253,9 @@ class _Cursor:
         self._pdf.drawString(MARGIN, self.y, text.upper())  # type: ignore[attr-defined]
         self.space(11)
 
-    def paragraph(self, text: str, *, size: float = BODY_SIZE, muted: bool = False) -> None:
+    def paragraph(
+        self, text: str, *, size: float = BODY_SIZE, muted: bool = False
+    ) -> None:
         for line in _wrap(text, size, CONTENT_WIDTH):
             self.need(LEADING)
             self._pdf.setFont("Helvetica", size)  # type: ignore[attr-defined]

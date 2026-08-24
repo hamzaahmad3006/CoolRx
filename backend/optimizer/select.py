@@ -95,9 +95,7 @@ class PlanResult:
 
     @property
     def total_person_hours_avoided(self) -> float:
-        return sum(
-            item.person_hours_avoided or 0.0 for item in self.selected
-        )
+        return sum(item.person_hours_avoided or 0.0 for item in self.selected)
 
     @property
     def people_reached(self) -> float:
@@ -126,7 +124,9 @@ def objective_benefit(
     if objective == "max_person_heat_hours":
         # Falls back to raw hours where population is unknown, so a tile with a
         # census gap still competes rather than scoring zero and never being chosen.
-        return person_hours_avoided if person_hours_avoided is not None else hours_avoided
+        return (
+            person_hours_avoided if person_hours_avoided is not None else hours_avoided
+        )
 
     weighted = equity_weighted(person_hours_avoided, svi_score, equity_lambda)
     if weighted is not None:

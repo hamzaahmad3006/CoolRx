@@ -14,8 +14,8 @@ from sqlalchemy.orm import Session
 
 from controllers.analytics import AnalyticsController
 from controllers.catalog import CatalogController
-from controllers.plan_views import PlanViewsController
 from controllers.diagnose import DiagnoseController
+from controllers.plan_views import PlanViewsController
 from controllers.prescribe import PrescribeController
 from controllers.projects import ProjectController
 from core.config import Settings, get_settings

@@ -15,7 +15,6 @@ from pyproj import Geod
 from geo.enrich import apply_district_mean, enrich_tiles
 from geo.grid import (
     MAX_TILES,
-    GridSpec,
     Tile,
     build_grid,
     estimate_tile_count,
@@ -23,7 +22,6 @@ from geo.grid import (
 )
 from geo.providers import (
     ENRICHABLE_FIELDS,
-    REQUIRED_FEATURE_FIELDS,
     FeatureProvider,
     GeometryProvider,
     ProviderInfo,
@@ -71,7 +69,9 @@ def test_neighbouring_tile_centroids_do_not_collide() -> None:
     base_lon, base_lat = -112.074, 33.448
     # ~60 m north and ~60 m east.
     north = tile_key(base_lon, base_lat + 60 / 111_320)
-    east = tile_key(base_lon + 60 / (111_320 * math.cos(math.radians(base_lat))), base_lat)
+    east = tile_key(
+        base_lon + 60 / (111_320 * math.cos(math.radians(base_lat))), base_lat
+    )
     origin = tile_key(base_lon, base_lat)
     assert len({origin, north, east}) == 3
 
@@ -105,12 +105,12 @@ def test_empty_geohash_raises() -> None:
 @pytest.mark.parametrize(
     ("lon", "lat", "epsg"),
     [
-        (-112.07, 33.45, 32612),   # Phoenix, zone 12N
-        (-74.0, 40.7, 32618),      # New York, zone 18N
-        (-157.8, 21.3, 32604),     # Honolulu, zone 4N
-        (-149.9, 61.2, 32606),     # Anchorage, zone 6N
-        (-58.4, -34.6, 32721),     # Buenos Aires, zone 21S
-        (0.0, 51.5, 32631),        # Greenwich, zone 31N
+        (-112.07, 33.45, 32612),  # Phoenix, zone 12N
+        (-74.0, 40.7, 32618),  # New York, zone 18N
+        (-157.8, 21.3, 32604),  # Honolulu, zone 4N
+        (-149.9, 61.2, 32606),  # Anchorage, zone 6N
+        (-58.4, -34.6, 32721),  # Buenos Aires, zone 21S
+        (0.0, 51.5, 32631),  # Greenwich, zone 31N
     ],
 )
 def test_utm_zone_selection(lon: float, lat: float, epsg: int) -> None:
@@ -212,8 +212,7 @@ def test_estimate_matches_the_built_grid() -> None:
     for granularity in (60, 80, 100):
         _, spec = build_grid(**PHOENIX, granularity_m=granularity)
         assert (
-            estimate_tile_count(**PHOENIX, granularity_m=granularity)
-            == spec.tile_count
+            estimate_tile_count(**PHOENIX, granularity_m=granularity) == spec.tile_count
         )
 
 
@@ -250,9 +249,13 @@ def test_invalid_granularity_is_rejected(granularity: int) -> None:
 
 def test_inverted_bounds_are_rejected() -> None:
     with pytest.raises(ValueError, match="west"):
-        build_grid(west=-112.0, south=33.43, east=-112.10, north=33.455, granularity_m=60)
+        build_grid(
+            west=-112.0, south=33.43, east=-112.10, north=33.455, granularity_m=60
+        )
     with pytest.raises(ValueError, match="south"):
-        build_grid(west=-112.10, south=33.50, east=-112.07, north=33.43, granularity_m=60)
+        build_grid(
+            west=-112.10, south=33.50, east=-112.07, north=33.43, granularity_m=60
+        )
 
 
 def test_absurdly_large_grid_is_refused() -> None:
@@ -269,7 +272,10 @@ def test_absurdly_large_grid_is_refused() -> None:
 
 class _StubProvider(FeatureProvider):
     def __init__(
-        self, name: str, values: dict[str, dict[str, float | None]], fields: tuple[str, ...]
+        self,
+        name: str,
+        values: dict[str, dict[str, float | None]],
+        fields: tuple[str, ...],
     ) -> None:
         self._name = name
         self._values = values
@@ -277,7 +283,9 @@ class _StubProvider(FeatureProvider):
 
     @property
     def info(self) -> ProviderInfo:
-        return ProviderInfo(name=self._name, resolution_m=30.0, source="stub", vintage="test")
+        return ProviderInfo(
+            name=self._name, resolution_m=30.0, source="stub", vintage="test"
+        )
 
     @property
     def fields(self) -> tuple[str, ...]:
@@ -331,12 +339,8 @@ def test_unavailable_provider_yields_nulls_not_zeros() -> None:
 
 def test_a_null_never_overwrites_a_real_value() -> None:
     """Provider ordering must not let a later miss erase an earlier reading."""
-    good = _StubProvider(
-        "fine", {"key0": {"canopy_pct": 42.0}}, ("canopy_pct",)
-    )
-    empty = _StubProvider(
-        "coarse", {"key0": {"canopy_pct": None}}, ("canopy_pct",)
-    )
+    good = _StubProvider("fine", {"key0": {"canopy_pct": 42.0}}, ("canopy_pct",))
+    empty = _StubProvider("coarse", {"key0": {"canopy_pct": None}}, ("canopy_pct",))
     rows, _ = enrich_tiles(_tiles(1), [good, empty])
     assert rows[0]["canopy_pct"] == 42.0
 
@@ -361,7 +365,9 @@ def test_partial_coverage_is_measured() -> None:
 
 
 def test_provider_answering_for_an_unknown_tile_is_ignored() -> None:
-    stray = _StubProvider("stray", {"not-in-batch": {"canopy_pct": 99.0}}, ("canopy_pct",))
+    stray = _StubProvider(
+        "stray", {"not-in-batch": {"canopy_pct": 99.0}}, ("canopy_pct",)
+    )
     rows, _ = enrich_tiles(_tiles(2), [stray])
     assert all(row["canopy_pct"] is None for row in rows)
     assert len(rows) == 2
@@ -397,7 +403,9 @@ def test_report_lists_each_provider() -> None:
         _tiles(2),
         [
             GeometryProvider(),
-            UnavailableProvider(name="nlcd", fields=("canopy_pct",), reason="no raster"),
+            UnavailableProvider(
+                name="nlcd", fields=("canopy_pct",), reason="no raster"
+            ),
         ],
     )
     names = {info.name for info in report.providers}

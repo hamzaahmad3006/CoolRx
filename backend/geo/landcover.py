@@ -154,7 +154,6 @@ class LandCoverProvider(FeatureProvider):
         Subset in the coverage's own EPSG:3857, output in 4326 — see the module
         docstring for why neither half is optional.
         """
-        import httpx
         import rasterio
         from pyproj import Transformer
 

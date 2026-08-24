@@ -72,6 +72,21 @@ jobs:
           echo "recorded fixtures: $count"
           test "$count" -gt 0 || { echo "::error::no fixtures committed"; exit 1; }
 
+      # The suite skips its Postgres-backed tests when no database answers, so a
+      # green run against an unmigrated database proves less than it looks like it
+      # does. Migrating and loading the catalog here is what makes the readiness
+      # tests -- and AC-23, which asserts the boot gate refuses an empty catalog --
+      # actually execute rather than skip.
+      - name: Migrate
+        env:
+          DATABASE_URL: postgresql+psycopg://coolrx:coolrx@localhost:5432/coolrx
+        run: alembic upgrade head
+
+      - name: Load intervention catalog
+        env:
+          DATABASE_URL: postgresql+psycopg://coolrx:coolrx@localhost:5432/coolrx
+        run: python -m scripts.load_catalog
+
       - name: Tests
         env:
           DATABASE_URL: postgresql+psycopg://coolrx:coolrx@localhost:5432/coolrx

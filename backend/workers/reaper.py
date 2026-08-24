@@ -57,7 +57,7 @@ def main(argv: list[str] | None = None) -> int:
     while True:
         try:
             sweep()
-        except Exception:  # noqa: BLE001 — a sweep failure must not kill the loop
+        except Exception:  # a sweep failure must not kill the loop
             log.exception("reaper.sweep_failed")
         time.sleep(args.interval)
 

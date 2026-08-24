@@ -208,7 +208,7 @@ class CensusExposureProvider(FeatureProvider):
         tile_index = STRtree(tile_geoms)
         group_index = STRtree(geometries)
 
-        totals: dict[str, float] = {g: 0.0 for g in geoids}
+        totals: dict[str, float] = dict.fromkeys(geoids, 0.0)
         shares: dict[str, dict[str, float]] = {g: {} for g in geoids}
 
         with dataset:
@@ -265,7 +265,6 @@ class CensusExposureProvider(FeatureProvider):
         self, west: float, south: float, east: float, north: float
     ) -> list[dict[str, Any]]:
         """Block-group polygons intersecting the AOI. No key needed."""
-        import httpx
 
         params = {
             "where": "1=1",
@@ -292,7 +291,6 @@ class CensusExposureProvider(FeatureProvider):
         Batched by tract because ACS cannot wildcard block groups across tracts:
         `for=block group:*` requires `in=...tract:<one tract>`.
         """
-        import httpx
 
         tracts: set[tuple[str, str, str]] = set()
         for feature in groups:
@@ -373,7 +371,7 @@ class CensusExposureProvider(FeatureProvider):
                 continue
             try:
                 geometry = shape(feature["geometry"])
-            except Exception:  # noqa: BLE001 — a malformed polygon is skipped
+            except Exception:  # noqa: BLE001, S112 — a malformed polygon is skipped; not logged, because these loops run over thousands of upstream records and a line per skip would drown the run
                 continue
             if geometry.is_empty or geometry.area <= 0:
                 continue

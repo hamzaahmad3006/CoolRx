@@ -48,7 +48,9 @@ def _feature(
     }
 
 
-def _result(*features: dict[str, Any], stats: dict[str, Any] | None = None) -> dict[str, Any]:
+def _result(
+    *features: dict[str, Any], stats: dict[str, Any] | None = None
+) -> dict[str, Any]:
     return {
         "map_data": {"type": "FeatureCollection", "features": list(features)},
         "stats_data": stats if stats is not None else {},
@@ -78,10 +80,15 @@ def test_geometry_and_bounds_come_from_the_response() -> None:
     Index-matching against a locally generated grid would mis-assign every
     temperature the moment their tiling differed from ours by one cell.
     """
-    parsed = parse_heatmap(_result(_feature(-112.10, 33.43, -112.09, 33.44, value=41.2)))
+    parsed = parse_heatmap(
+        _result(_feature(-112.10, 33.43, -112.09, 33.44, value=41.2))
+    )
     tile = parsed.tiles[0]
     assert (tile.west, tile.south, tile.east, tile.north) == (
-        -112.10, 33.43, -112.09, 33.44,
+        -112.10,
+        33.43,
+        -112.09,
+        33.44,
     )
     assert tile.centroid_lon == pytest.approx(-112.095)
     assert tile.centroid_lat == pytest.approx(33.435)
@@ -218,7 +225,10 @@ def test_a_missing_stat_is_none_not_zero() -> None:
     """A district mean of 0 °C would make every tile look extraordinarily hot."""
     assert read_stat(_result(), "mean") is None
     assert read_stat({}, "mean") is None
-    assert read_stat(_result(stats={"Temperature_stats": {"Mean": "warm"}}), "mean") is None
+    assert (
+        read_stat(_result(stats={"Temperature_stats": {"Mean": "warm"}}), "mean")
+        is None
+    )
 
 
 def test_units_are_echoed_from_the_response() -> None:
@@ -312,8 +322,88 @@ def test_several_problems_are_reported_together() -> None:
 def test_every_catalog_unit_has_a_default_quantity() -> None:
     from repositories.catalog import VALID_UNITS
 
-    assert VALID_UNITS <= set(DEFAULT_QUANTITIES)
+    assert set(DEFAULT_QUANTITIES) >= VALID_UNITS
 
 
 def test_default_quantities_are_positive() -> None:
     assert all(value > 0 for value in DEFAULT_QUANTITIES.values())
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# The per-run statistics block
+# ═════════════════════════════════════════════════════════════════════════════
+
+
+class _StubRun:
+    """Just the three attributes `stats_of_run` reads."""
+
+    def __init__(self, stats: dict[str, Any], units: str | None) -> None:
+        self.stats = stats
+        self.units = units
+
+
+def test_a_nested_temperature_block_reaches_the_flat_stats_model() -> None:
+    """`/stats` publishes the same numbers twice — once as the project summary and
+    once per analytic run — and only the summary was reading the nested shape.
+
+    A `tcm` response nests its figures under `stats_data.temperature_stats` with
+    the names `minimum` / `maximum` / `standard_deviation`, none of which match
+    the flat model's fields. Validating the stored blob directly matched nothing
+    and every field came back null, without raising: the fields are all optional
+    because the block genuinely varies by analytic type. So the temperature run —
+    the one the whole diagnosis is about — published an empty statistics block
+    while the exceedance runs beside it, whose `stats_data` really is flat, looked
+    fine. That contrast is what made it survive review.
+    """
+    from controllers.adapters import stats_of_run
+
+    run = _StubRun(
+        {
+            "temperature_stats": {
+                "minimum": 36.8048,
+                "maximum": 37.1297,
+                "mean": 37.073502184873945,
+                "standard_deviation": 0.06006792422644658,
+            },
+            "temperature_frequency": {"ignored": [1, 2, 3]},
+        },
+        units=None,
+    )
+
+    stats = stats_of_run(run)  # type: ignore[arg-type]
+
+    assert stats.min == pytest.approx(36.8048)
+    assert stats.max == pytest.approx(37.1297)
+    assert stats.mean == pytest.approx(37.0735, abs=1e-4)
+    assert stats.std == pytest.approx(0.0601, abs=1e-4)
+    # The API publishes no median, and averaging the ends would invent one.
+    assert stats.median is None
+    # No units field is sent for `tcm`; echoing the run's own null is the point.
+    assert stats.units is None
+
+
+def test_a_flat_block_still_reads_and_units_are_echoed() -> None:
+    """Exceedance responses are flat. The same reader must handle both shapes, or
+    fixing one would break the other."""
+    from controllers.adapters import stats_of_run
+
+    stats = stats_of_run(
+        _StubRun({"min": 0.1885, "max": 1.1164, "mean": 0.9510}, units="hour")  # type: ignore[arg-type]
+    )
+
+    assert stats.min == pytest.approx(0.1885)
+    assert stats.max == pytest.approx(1.1164)
+    assert stats.mean == pytest.approx(0.9510)
+    assert stats.units == "hour"
+
+
+def test_an_empty_block_yields_nulls_rather_than_zeros() -> None:
+    """A mean of 0 °C would render as a real measurement."""
+    from controllers.adapters import stats_of_run
+
+    stats = stats_of_run(_StubRun({}, units=None))  # type: ignore[arg-type]
+
+    assert stats.min is None
+    assert stats.max is None
+    assert stats.mean is None
+    assert stats.std is None

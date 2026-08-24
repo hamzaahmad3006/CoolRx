@@ -298,13 +298,13 @@ class WaterDistanceProvider(FeatureProvider):
                 if len(ring) >= 4:
                     try:
                         geometries.append(Polygon(ring))
-                    except Exception:  # noqa: BLE001 — one bad ring is not fatal
+                    except Exception:  # noqa: BLE001, S112 — one bad ring is not fatal; not logged, because these loops run over thousands of upstream records and a line per skip would drown the run
                         continue
             for path in geometry.get("paths", []):
                 if len(path) >= 2:
                     try:
                         geometries.append(LineString(path))
-                    except Exception:  # noqa: BLE001
+                    except Exception:  # noqa: BLE001, S112 — one bad ring is not fatal; not logged, because these loops run over thousands of upstream records and a line per skip would drown the run
                         continue
 
         return geometries

@@ -142,7 +142,6 @@ class BuildingFootprintProvider(FeatureProvider):
         self, west: float, south: float, east: float, north: float
     ) -> list[Any]:
         """Every mapped building in the bounding box, as shapely polygons."""
-        import httpx
         from shapely.geometry import Polygon
 
         query = (
@@ -173,7 +172,7 @@ class BuildingFootprintProvider(FeatureProvider):
                     # Self-touching footprints are common in OSM; buffer(0) is
                     # the standard repair and is safe for area.
                     polygon = polygon.buffer(0)
-            except Exception:  # noqa: BLE001 — one bad way is not fatal
+            except Exception:  # noqa: BLE001, S112 — one bad way is not fatal; not logged, because these loops run over thousands of upstream records and a line per skip would drown the run
                 continue
             if not polygon.is_empty and polygon.area > 0:
                 polygons.append(polygon)

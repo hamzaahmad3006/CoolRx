@@ -61,14 +61,19 @@ def test_explicit_anthropic_does_not_fall_back_to_groq() -> None:
 
 
 def test_none_disables_narration_even_with_keys_present() -> None:
-    assert _build(provider="none", anthropic_api_key="sk-ant-x", groq_api_key="gsk-y") is None
+    assert (
+        _build(provider="none", anthropic_api_key="sk-ant-x", groq_api_key="gsk-y")
+        is None
+    )
 
 
 @pytest.mark.parametrize("provider", ["AUTO", "Groq", "ANTHROPIC"])
 def test_provider_is_case_insensitive(provider: str) -> None:
     """Configuration comes from environment variables, where case is easy to get
     wrong and a silent no-op would look like a missing key."""
-    assert _build(provider=provider, anthropic_api_key="k", groq_api_key="k") is not None
+    assert (
+        _build(provider=provider, anthropic_api_key="k", groq_api_key="k") is not None
+    )
 
 
 # ═════════════════════════════════════════════════════════════════════════════

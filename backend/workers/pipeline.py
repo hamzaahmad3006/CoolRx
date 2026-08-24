@@ -34,12 +34,14 @@ from clients.fortyguard.parsing import parse_heatmap, read_stat
 from core.config import Settings
 from geo import (
     EXPOSURE_FIELDS,
-    Tile as GridTile,
     apply_district_mean,
     default_providers,
     enrich_tiles,
     estimate_tile_count,
     tile_key,
+)
+from geo import (
+    Tile as GridTile,
 )
 from ml import (
     ModelNotTrained,
@@ -126,7 +128,10 @@ def run_diagnose_pipeline(
         # values attach to come from the API's `map_data`, because they are the
         # ones the measurements were taken on.
         expected = estimate_tile_count(
-            west=west, south=south, east=east, north=north,
+            west=west,
+            south=south,
+            east=east,
+            north=north,
             granularity_m=granularity,
         )
 
@@ -166,6 +171,21 @@ def run_diagnose_pipeline(
                 threshold_c=threshold_c,
                 steps=settings.fg_ladder_steps,
             )
+
+        # ── Persistence and peak hour ────────────────────────────────────────
+        # Two calls the credit estimate already assumes and the priorities table
+        # already reads. Cheap next to the eleven-rung ladder above.
+        secondary_missing = _fetch_secondary_analytics(
+            client=client,
+            session=session,
+            tiles_repo=tiles_repo,
+            project_id=project_id,
+            bounds=bounds,
+            granularity=granularity,
+            start_date=start_date,
+            start_time=start_time,
+            threshold_c=threshold_c,
+        )
 
         # ── Enrichment ───────────────────────────────────────────────────────
         jobs.advance(job_id, stage="enriching_features", progress_pct=60)
@@ -223,9 +243,7 @@ def run_diagnose_pipeline(
         # no census answer keeps a null population, which the priority ranking
         # already handles by falling back to raw hours -- an invented population
         # would silently reweight the whole plan.
-        written = tiles_repo.upsert_exposure(
-            project_id=project_id, rows=exposure_rows
-        )
+        written = tiles_repo.upsert_exposure(project_id=project_id, rows=exposure_rows)
         with_population = sum(
             1 for row in exposure_rows if row.get("population") is not None
         )
@@ -251,6 +269,7 @@ def run_diagnose_pipeline(
 
         degraded = _degradation_reason(
             enrichment_unavailable=enrichment.unavailable,
+            secondary_missing=secondary_missing,
             attributed=attributed,
             tile_count=len(tcm_parsed.tiles),
             ladder_tiles=len(ladders),
@@ -265,6 +284,91 @@ def run_diagnose_pipeline(
         )
     finally:
         client.close()
+
+
+def _fetch_secondary_analytics(
+    *,
+    client: FortyGuardClient,
+    session: Session,
+    tiles_repo: TileRepository,
+    project_id: uuid.UUID,
+    bounds: tuple[float, float, float, float],
+    granularity: int,
+    start_date: str,
+    start_time: str,
+    threshold_c: float,
+) -> list[str]:
+    """`time_of_measure` and `persistence`, one call each. Returns what failed.
+
+    Both were already paid for and already consumed. `controllers/projects.py`
+    quotes a diagnosis at one `tcm`, one `time_of_measure`, one `persistence` and
+    eleven `exceedance` steps; `optimizer/priorities.py` looks up the latest run
+    of each of those two types and converts the peak hour to district-local time;
+    the priorities schema carries `persistence_hours` and `peak_hour_local`; and
+    the frontend ships a peak-hour clock to draw them. The pipeline was the one
+    link that never made the calls, so both columns were null for every tile and
+    the clock had nothing to render — while the credit estimate charged for them.
+
+    Neither is load-bearing. A failure here costs two columns, so each is caught
+    separately and named in the degradation reason rather than failing a
+    diagnosis whose temperature field and ladder are already persisted.
+
+    `threshold_c` is sent for `persistence` (hours *above* it) and withheld from
+    `time_of_measure`, which ignores it — matching how the fixtures were recorded,
+    so a fixture-backed run finds them.
+
+    **Both columns are spatially constant at the window this pipeline requests,
+    and that is arithmetic rather than a defect.** A diagnosis asks for one hour
+    (`filter_type: 1`, a single `start_time`), so hours-above-threshold can only
+    be 0 or 1 — the recorded districts read 1.0 across Phoenix at ~37 °C and 0.0
+    across Las Vegas at ~34.6 °C — and a peak hour chosen from a one-hour window
+    has one candidate. Both become informative only over a multi-hour window.
+    Anyone widening it should look here first.
+
+    One deviation from FR-007 worth knowing: the spec converts the UTC peak hour
+    to local time using `env_params.metadata.timezone_offset_hours`, and
+    `optimizer.priorities` converts from longitude instead, because `env_params`
+    (FR-008) is not wired into this pipeline. The two agree for the three preset
+    districts, all of which sit in MST with no daylight saving; they will not
+    agree everywhere.
+    """
+    missing: list[str] = []
+
+    for analytic, threshold in (
+        ("time_of_measure", None),
+        ("persistence", threshold_c),
+    ):
+        try:
+            result = _fetch_analytic(
+                client,
+                bounds=bounds,
+                analytic=analytic,
+                granularity=granularity,
+                start_date=start_date,
+                start_time=start_time,
+                threshold_c=threshold,
+            )
+            _persist_analytic(
+                session=session,
+                tiles_repo=tiles_repo,
+                project_id=project_id,
+                result=result,
+                analytic=analytic,
+                granularity=granularity,
+                start_date=start_date,
+                start_time=start_time,
+                threshold_c=threshold,
+            )
+        except Exception as exc:  # noqa: BLE001
+            missing.append(analytic)
+            log.warning(
+                "pipeline.secondary_analytic_unavailable",
+                analytic=analytic,
+                error=type(exc).__name__,
+                detail=str(exc),
+            )
+
+    return missing
 
 
 def _fetch_analytic(
@@ -439,9 +543,7 @@ def _build_ladders(
         ladder = build_ladder(
             tile_key=key,
             base_threshold_c=threshold_c,
-            hours_by_step={
-                step: values.get(key) for step, values in by_step.items()
-            },
+            hours_by_step={step: values.get(key) for step, values in by_step.items()},
             steps=steps,
         )
         # None means a rung was missing. The tile is excluded from hours-avoided
@@ -525,6 +627,7 @@ def _attribute(
 def _degradation_reason(
     *,
     enrichment_unavailable: list[str],
+    secondary_missing: list[str] | None = None,
     attributed: int,
     tile_count: int,
     ladder_tiles: int,
@@ -539,12 +642,20 @@ def _degradation_reason(
 
     if enrichment_unavailable:
         problems.append(
-            f"land-cover and terrain data unavailable ({', '.join(enrichment_unavailable)})"
+            f"land-cover and terrain data unavailable "
+            f"({', '.join(enrichment_unavailable)})"
+        )
+    if secondary_missing:
+        problems.append(
+            f"{' and '.join(secondary_missing)} unavailable, so persistence and "
+            f"peak-hour columns are blank"
         )
     if attributed == 0:
         problems.append("no trained model, so heat drivers are not attributed")
     if wanted_ladder and ladder_tiles == 0:
-        problems.append("the exceedance ladder is incomplete, so impact stays in degrees")
+        problems.append(
+            "the exceedance ladder is incomplete, so impact stays in degrees"
+        )
     elif wanted_ladder and ladder_tiles < tile_count * 0.5:
         problems.append(
             f"only {ladder_tiles} of {tile_count} blocks have a complete ladder"

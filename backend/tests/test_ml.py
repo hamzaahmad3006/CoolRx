@@ -189,7 +189,7 @@ def test_values_outside_the_trained_range_are_flagged() -> None:
 
 
 def test_a_mostly_empty_vector_is_out_of_support() -> None:
-    sparse = {name: None for name in FEATURE_ORDER}
+    sparse = dict.fromkeys(FEATURE_ORDER)
     result = check_support(sparse)
     assert not result.in_support
     assert "unmeasured" in result.reason_text

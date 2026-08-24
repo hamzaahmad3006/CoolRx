@@ -12,6 +12,7 @@ import uuid
 
 from fastapi import APIRouter, HTTPException, Response, status
 
+from controllers.plan_report import build_plan_report
 from schemas.common import ProvenanceResponse
 from schemas.plans import CounterfactualResponse, PlanResponse
 from schemas.verification import (
@@ -19,8 +20,6 @@ from schemas.verification import (
     VerificationResultResponse,
     VerifyRequest,
 )
-
-from controllers.plan_report import build_plan_report
 
 from .deps import PlanViewsControllerDep, PrescribeControllerDep, SessionDep
 

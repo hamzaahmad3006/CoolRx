@@ -262,7 +262,9 @@ def test_granularity_rule_still_catches_dict_sourced_requests() -> None:
     """
     request = HeatmapRequest.model_construct(
         polygon_aoi=square_aoi(),
-        date_time=DateTimeSpec(start_date="2025-07-15", start_time="15:00", filter_type=1),
+        date_time=DateTimeSpec(
+            start_date="2025-07-15", start_time="15:00", filter_type=1
+        ),
         granularity=50,  # type: ignore[arg-type]
         analytic_type=AnalyticType.TCM,
         threshold=None,

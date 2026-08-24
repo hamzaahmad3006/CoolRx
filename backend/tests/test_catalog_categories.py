@@ -28,7 +28,9 @@ import pytest
 from optimizer.counterfactual import TileContext, check_feasibility
 from repositories.catalog import read_catalog_csv
 
-CATALOG_PATH = Path(__file__).resolve().parents[1] / "data" / "interventions_catalog.csv"
+CATALOG_PATH = (
+    Path(__file__).resolve().parents[1] / "data" / "interventions_catalog.csv"
+)
 
 #: Below this, a citation is a label rather than a provenance record. The shipped
 #: rows run to 1,200 and 2,600 characters because they carry their assumptions.
@@ -43,6 +45,7 @@ def rows():
 
 
 # ── the product guarantee ────────────────────────────────────────────────────
+
 
 def test_the_catalog_spans_more_than_one_category(rows) -> None:
     """The optimizer cannot make a trade-off it has no alternatives for."""
@@ -70,6 +73,7 @@ def test_categories_differ_in_both_cost_and_effect(rows) -> None:
 
 
 # ── provenance ───────────────────────────────────────────────────────────────
+
 
 def test_every_row_cites_both_a_cost_and_an_effect(rows) -> None:
     """A row needs both halves. One sourced half and one invented half is worse
@@ -108,6 +112,7 @@ def test_cooling_is_negative_and_ordered(rows) -> None:
 
 # ── feasibility rules the optimizer can actually read ────────────────────────
 
+
 def test_feasibility_rules_use_keys_the_optimizer_supports(rows) -> None:
     """An unsupported key is not an error anywhere — it is simply never applied,
     so the rule silently does nothing and the intervention is offered on tiles it
@@ -138,9 +143,7 @@ def test_a_bare_tile_admits_at_least_two_categories(rows) -> None:
         grass_shrub_pct=4.0,
         population=180.0,
     )
-    feasible = {
-        row.category for row in rows if check_feasibility(row, tile) is None
-    }
+    feasible = {row.category for row in rows if check_feasibility(row, tile) is None}
     assert len(feasible) >= 2, (
         f"only {feasible} feasible on a normal urban tile — the plan has no "
         f"trade-off to make there"

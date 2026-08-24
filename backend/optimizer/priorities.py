@@ -195,7 +195,9 @@ def rank_tiles(
             )
         )
 
-    measured = [row.exceedance_hours for row in rows if row.exceedance_hours is not None]
+    measured = [
+        row.exceedance_hours for row in rows if row.exceedance_hours is not None
+    ]
     thresholds = _quartile_thresholds(measured) if measured else (0.0, 0.0, 0.0)
 
     scored: list[tuple[float, TilePriorityResponse]] = []

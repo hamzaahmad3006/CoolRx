@@ -12,6 +12,7 @@ the answer is that the guard rejected the model's text and it was discarded.
 from __future__ import annotations
 
 import uuid
+
 from fastapi import APIRouter, HTTPException, status
 
 from repositories.agent import AgentRunRepository

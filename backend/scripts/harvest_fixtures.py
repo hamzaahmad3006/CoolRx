@@ -20,10 +20,9 @@ exact cost without spending anything.
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
-import json
 import sys
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 
 import structlog
@@ -272,7 +271,7 @@ def harvest(
                     "analytic_type": analytic,
                     "threshold_c": threshold,
                     "activity_id": result.activity_id,
-                    "captured_at": datetime.now(timezone.utc).isoformat(),
+                    "captured_at": datetime.now(UTC).isoformat(),
                 },
             )
             captured += 1

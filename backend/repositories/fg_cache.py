@@ -107,7 +107,7 @@ class FgCacheRepository:
 
     # ── Audit ────────────────────────────────────────────────────────────────
 
-    def record(self, audit: "AuditRecord") -> None:
+    def record(self, audit: AuditRecord) -> None:
         """Persist an audit record for any outcome, including failures.
 
         Failures are recorded deliberately: the `activity_id` is what FortyGuard
@@ -180,7 +180,7 @@ def make_client_hooks(
 ) -> tuple[
     Callable[[str], dict[str, Any] | None],
     Callable[[str, str, dict[str, Any], dict[str, Any]], None],
-    Callable[["AuditRecord"], None],
+    Callable[[AuditRecord], None],
     Callable[[], int],
 ]:
     """Build the callbacks `FortyGuardClient` expects.

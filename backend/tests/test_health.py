@@ -65,20 +65,26 @@ def test_liveness_answers_even_without_a_database(client: TestClient) -> None:
     assert body["mode"] in {"live", "fixture"}
 
 
-def test_liveness_reports_database_state_honestly(client: TestClient, no_database: None) -> None:
+def test_liveness_reports_database_state_honestly(
+    client: TestClient, no_database: None
+) -> None:
     """With no database running, the payload must say so rather than claim ok."""
     body = client.get("/api/health").json()
     assert body["dependencies"]["database"] == "down"
     assert body["status"] == "degraded"
 
 
-def test_readiness_is_503_without_a_database(client: TestClient, no_database: None) -> None:
+def test_readiness_is_503_without_a_database(
+    client: TestClient, no_database: None
+) -> None:
     response = client.get("/api/health/ready")
     assert response.status_code == 503
     assert response.json()["ready"] is False
 
 
-def test_readiness_names_the_failing_checks(client: TestClient, no_database: None) -> None:
+def test_readiness_names_the_failing_checks(
+    client: TestClient, no_database: None
+) -> None:
     """A failing probe must be diagnosable from its own response."""
     body = client.get("/api/health/ready").json()
     checks = {check["name"]: check for check in body["checks"]}
@@ -128,6 +134,7 @@ def test_readiness_check_states_are_within_the_declared_enum(
 # above is about refusing traffic; none of them could show that the probe ever
 # *admits* it, so a readiness endpoint hard-wired to 503 would have passed the
 # whole file.
+
 
 @pytest.fixture
 def database_up(monkeypatch: pytest.MonkeyPatch) -> None:

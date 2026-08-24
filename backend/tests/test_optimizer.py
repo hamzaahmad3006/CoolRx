@@ -157,7 +157,9 @@ def test_a_missing_rung_yields_no_ladder_rather_than_an_interpolated_one() -> No
     """
     steps: dict[int, float | None] = dict(enumerate(DECAY))
     steps[4] = None
-    assert build_ladder(tile_key="t1", base_threshold_c=35.0, hours_by_step=steps) is None
+    assert (
+        build_ladder(tile_key="t1", base_threshold_c=35.0, hours_by_step=steps) is None
+    )
 
 
 def test_non_monotonic_rungs_are_clamped_not_propagated() -> None:
@@ -276,7 +278,9 @@ def _delta(value: float = -1.5) -> DeltaEstimate:
 
 
 def test_max_delta_ignores_exposure_entirely() -> None:
-    """That is the point of offering it: "where can we cool most", not "who benefits"."""
+    """That is the point of offering it: "where can we cool most",
+    not "who benefits".
+    """
     args = {
         "objective": "max_delta_c",
         "delta": _delta(-2.0),
@@ -356,16 +360,14 @@ def _candidate(
 
 
 def test_selection_never_exceeds_the_budget() -> None:
-    candidates = [
-        _candidate(f"t{i}", cost=3_000.0, benefit=100.0) for i in range(10)
-    ]
+    candidates = [_candidate(f"t{i}", cost=3_000.0, benefit=100.0) for i in range(10)]
     result = select_plan(candidates=candidates, budget_usd=10_000.0)
     assert result.total_cost_usd <= 10_000.0
     assert len(result.selected) == 3
 
 
 def test_the_most_cost_effective_candidate_is_chosen_first() -> None:
-    cheap = _candidate("t1", cost=100.0, benefit=100.0)   # 1.0 per dollar
+    cheap = _candidate("t1", cost=100.0, benefit=100.0)  # 1.0 per dollar
     dear = _candidate("t2", cost=1_000.0, benefit=200.0)  # 0.2 per dollar
     result = select_plan(candidates=[dear, cheap], budget_usd=100.0)
     assert [c.tile_key for c in result.selected] == ["t1"]
@@ -373,8 +375,8 @@ def test_the_most_cost_effective_candidate_is_chosen_first() -> None:
 
 def test_a_cheaper_candidate_is_taken_after_an_unaffordable_one() -> None:
     """Stopping at the first miss would leave budget unspent for no reason."""
-    big = _candidate("t1", cost=9_000.0, benefit=9_000.0)   # 1.0 per dollar
-    small = _candidate("t2", cost=400.0, benefit=200.0)     # 0.5 per dollar
+    big = _candidate("t1", cost=9_000.0, benefit=9_000.0)  # 1.0 per dollar
+    small = _candidate("t2", cost=400.0, benefit=200.0)  # 0.5 per dollar
     result = select_plan(candidates=[big, small], budget_usd=1_000.0)
     assert [c.tile_key for c in result.selected] == ["t2"]
 

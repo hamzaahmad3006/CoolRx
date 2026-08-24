@@ -110,7 +110,7 @@ def run_diagnose(
     except PipelineError as exc:
         log.warning("diagnose.pipeline_error", job_id=job_id_str, detail=str(exc))
         _fail(job_id, str(exc))
-    except Exception as exc:  # noqa: BLE001 — the job must reach a terminal state
+    except Exception as exc:  # the job must reach a terminal state
         log.exception("diagnose.failed", job_id=job_id_str)
         _fail(job_id, f"{type(exc).__name__}: {exc}")
     else:
@@ -171,7 +171,7 @@ def run_plan(
         # nothing affordable — because "plan generation failed" is unactionable.
         log.warning("plan.precondition_failed", job_id=job_id_str, detail=str(exc))
         _fail(job_id, str(exc))
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         log.exception("plan.failed", job_id=job_id_str)
         _fail(job_id, f"{type(exc).__name__}: {exc}")
     else:

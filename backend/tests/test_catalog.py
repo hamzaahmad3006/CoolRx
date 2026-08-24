@@ -112,7 +112,9 @@ def test_every_valid_category_is_accepted() -> None:
 
 
 def test_negative_cost_is_rejected() -> None:
-    assert any(r.startswith("unit_cost_usd:") for r in _reasons(_row(unit_cost_usd="-1")))
+    assert any(
+        r.startswith("unit_cost_usd:") for r in _reasons(_row(unit_cost_usd="-1"))
+    )
 
 
 def test_negative_maintenance_is_rejected() -> None:
@@ -122,7 +124,9 @@ def test_negative_maintenance_is_rejected() -> None:
 
 @pytest.mark.parametrize("bad", ["0", "-1", "", "ten", "3.5"])
 def test_invalid_lifespan_is_rejected(bad: str) -> None:
-    assert any(r.startswith("lifespan_years:") for r in _reasons(_row(lifespan_years=bad)))
+    assert any(
+        r.startswith("lifespan_years:") for r in _reasons(_row(lifespan_years=bad))
+    )
 
 
 @pytest.mark.parametrize("field", ["code", "name", "unit"])
@@ -173,9 +177,7 @@ def test_missing_columns_raise(tmp_path: Path) -> None:
 def test_comment_lines_are_ignored(tmp_path: Path) -> None:
     path = tmp_path / "c.csv"
     row = ",".join(_row()[c] for c in REQUIRED_COLUMNS)
-    path.write_text(
-        f"# a comment\n#another\n{HEADER}\n{row}\n", encoding="utf-8"
-    )
+    path.write_text(f"# a comment\n#another\n{HEADER}\n{row}\n", encoding="utf-8")
     rows, violations = read_catalog_csv(path)
     assert violations == []
     assert len(rows) == 1
@@ -204,7 +206,9 @@ def test_violation_reports_its_row_number(tmp_path: Path) -> None:
     """The error must say which line to fix."""
     path = tmp_path / "c.csv"
     good = ",".join(_row()[c] for c in REQUIRED_COLUMNS)
-    bad = ",".join(_row(code="bad_row", source_citation="")[c] for c in REQUIRED_COLUMNS)
+    bad = ",".join(
+        _row(code="bad_row", source_citation="")[c] for c in REQUIRED_COLUMNS
+    )
     path.write_text(f"{HEADER}\n{good}\n{bad}\n", encoding="utf-8")
     _, violations = read_catalog_csv(path)
     assert len(violations) == 1

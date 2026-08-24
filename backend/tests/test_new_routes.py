@@ -13,12 +13,13 @@ from __future__ import annotations
 import json
 
 import pytest
+from pydantic import ValidationError
 
 from routes.system import _limitations
 from schemas.analytics import TileFeature
 
-
 # ── the map layer ────────────────────────────────────────────────────────────
+
 
 def test_a_string_geometry_is_rejected_by_the_tile_schema() -> None:
     """The bug that made /tiles return 500 for every project.
@@ -28,9 +29,12 @@ def test_a_string_geometry_is_rejected_by_the_tile_schema() -> None:
     was still on fixtures the map looked fine the whole time.
     """
     geometry_json = json.dumps(
-        {"type": "Polygon", "coordinates": [[[0.0, 0.0], [0.0, 1.0], [1.0, 1.0], [0.0, 0.0]]]}
+        {
+            "type": "Polygon",
+            "coordinates": [[[0.0, 0.0], [0.0, 1.0], [1.0, 1.0], [0.0, 0.0]]],
+        }
     )
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         TileFeature(
             id="t",
             geometry=geometry_json,  # type: ignore[arg-type]
@@ -54,6 +58,7 @@ def test_a_parsed_geometry_is_accepted(*_: object) -> None:
 #
 # `limitations` is derived from the metrics rather than kept as a static list, so
 # a retrain cannot leave a stale reassurance on the page.
+
 
 def test_a_near_zero_r2_is_stated_as_no_transfer() -> None:
     out = _limitations({"r2": -0.009, "interval_coverage": 0.80})

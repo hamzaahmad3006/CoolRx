@@ -33,7 +33,17 @@ class CoolRxError(Exception):
     details: dict[str, DetailValue] = dc_field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        super().__init__(self.message)
+        # `Exception.__init__` explicitly, not zero-argument `super()`.
+        #
+        # `@dataclass(slots=True)` builds a *replacement* class, and on CPython
+        # below 3.14 the `__class__` cell captured by a zero-argument `super()`
+        # still points at the discarded original. The lookup then fails with
+        # "obj must be an instance or subtype of type" at construction time — so
+        # every domain error raised on 3.12 or 3.13 surfaced as a 500 instead of
+        # its mapped status. It works on 3.14 only because that release started
+        # rewriting the cell, which is why local runs never saw it while the
+        # 3.12 container and CI did.
+        Exception.__init__(self, self.message)
 
 
 @dataclass(slots=True)
