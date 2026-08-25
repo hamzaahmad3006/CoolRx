@@ -171,7 +171,7 @@ def test_unclosed_ring_is_a_422_envelope(client: TestClient) -> None:
 def test_multi_feature_aoi_is_rejected(client: TestClient) -> None:
     """FortyGuard takes one bounding box, so two features are ambiguous."""
     two = _box(west=-112.10, south=33.43, east=-112.07, north=33.455)
-    two["features"] = two["features"] * 2  # type: ignore[index,operator]
+    two["features"] = two["features"] * 2  # type: ignore[operator]
 
     assert (
         client.post("/api/projects/validate-aoi", json={"aoi": two}).status_code == 422
