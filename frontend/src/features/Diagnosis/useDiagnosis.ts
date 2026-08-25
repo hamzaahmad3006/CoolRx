@@ -16,7 +16,6 @@ import type { FgNormalDistribution } from '@/types/fortyguard';
 import type {
   EstimateUnit,
   FgAnalyticType,
-  FgStatsData,
   TileCollection,
   TilePriority,
 } from '@/types';
