@@ -9,7 +9,7 @@ import { SEMANTIC } from '@/constants';
 import { formatNumber } from '@/lib/format';
 import type { VerificationProtocol } from '@/types';
 
-import { useVerification, type DifferenceBreakdown } from './useVerification';
+import { useVerification } from './useVerification';
 
 /**
  * Verify (SRS screen #9).

@@ -14,7 +14,7 @@ import {
 } from 'maplibre-gl';
 import { useCallback, useEffect, useRef } from 'react';
 
-import { BRAND, MAP, MAP_DEFAULTS } from '@/constants';
+import { BRAND, MAP_DEFAULTS } from '@/constants';
 import { heatPaintExpression } from '@/lib/scale';
 import { cn } from '@/lib/cn';
 import type { TileCollection } from '@/types';

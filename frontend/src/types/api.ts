@@ -29,7 +29,6 @@ import type {
   FgAnalyticType,
   FgFeatureCollection,
   FgGranularity,
-  FgStatsData,
 } from './fortyguard';
 
 /* ─────────────────────────────────────────────────────────────────────────────
