@@ -16,6 +16,7 @@ import uuid
 from fastapi import APIRouter, HTTPException, status
 
 from repositories.agent import AgentRunRepository
+from repositories.tables import AgentRun
 from schemas.agent import AgentRunResponse
 
 from .deps import SessionDep
@@ -23,7 +24,7 @@ from .deps import SessionDep
 router = APIRouter(prefix="/agent", tags=["agent"])
 
 
-def _to_response(run) -> AgentRunResponse:
+def _to_response(run: AgentRun) -> AgentRunResponse:
     return AgentRunResponse(
         id=run.id,
         plan_id=run.plan_id,
