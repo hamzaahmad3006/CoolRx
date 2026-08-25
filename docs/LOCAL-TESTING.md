@@ -31,6 +31,39 @@ broken and nothing below will work.
 
 ---
 
+## The virtualenv: build it on 3.12, not on whatever is newest
+
+Option B and the test suite both run out of `backend/.venv`, and **which Python
+built it matters**. `backend/Dockerfile` is `python:3.12-slim` and CI pins 3.12, so
+3.12 is the version that ships. Running the suite on 3.14 instead is not a harmless
+difference: it hid three defects until the portability pass caught them, the worst
+being that every domain error surfaced as a 500 rather than its mapped status,
+because a zero-argument `super()` inside a slots dataclass only behaves on 3.14.
+
+```bash
+cd /d/CoolRx/backend
+py -3.12 -m venv .venv          # or: <path-to-3.12>/python.exe -m venv .venv
+./.venv/Scripts/python.exe -m pip install -e ".[dev]"
+./.venv/Scripts/python.exe --version   # must say 3.12.x
+```
+
+A venv keeps an absolute path to the interpreter that built it. If that Python is
+upgraded away or uninstalled, the venv does not fail gracefully — every command
+dies with `did not find executable at ...`. There is nothing to repair: delete
+`.venv` and rebuild it with the block above.
+
+**On Windows, LightGBM also needs the Visual C++ Redistributable.** Without it
+`import lightgbm` raises `FileNotFoundError: Could not find module
+'lib_lightgbm.dll' (or one of its dependencies)` — the DLL is present, its
+dependency is not — and 24 tests in `test_ml.py` and `test_conformal.py` fail for a
+reason that has nothing to do with the code:
+
+```bash
+winget install --id Microsoft.VCRedist.2015+.x64
+```
+
+---
+
 ## Option A — containers
 
 ```bash
@@ -226,8 +259,8 @@ been migrated and the catalog loaded, which is what the two commands in step 2 d
 Skips mean the services are not running: `conftest.py` probes the ports and skips
 rather than failing, so a green run with 42 skips is not the same as a green run.
 
-Also worth running once, because the container and CI use 3.12 while this machine
-has 3.14, and the two are not interchangeable:
+Also worth running once, because a finding here is not a style opinion — it is a
+red CI run:
 
 ```bash
 cd /d/CoolRx/backend
