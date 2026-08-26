@@ -119,7 +119,13 @@ export function SwipeCompareMap({
   const mapRef = useRef<MapLibreMap | null>(null);
   const draggingRef = useRef(false);
   const positionRef = useRef(position);
-  positionRef.current = position;
+  // Reconciles the optimistic writes in `commitPosition` back to the prop. This
+  // effect must stay declared above the one that calls `applyClip`, because
+  // effects run in declaration order and `applyClip` reads `positionRef.current`
+  // — reversing them would clip against the previous position for one frame.
+  useEffect(() => {
+    positionRef.current = position;
+  }, [position]);
 
   /** Translate the divider's screen fraction into a longitude and re-filter. */
   const applyClip = useCallback(() => {
@@ -220,11 +226,11 @@ export function SwipeCompareMap({
   /**
    * Emit a new position and optimistically advance the ref.
    *
-   * `positionRef` is refreshed during render, so without the local write a burst
-   * of keydowns faster than React can re-render would all read the same stale
-   * value and collapse into a single step — exactly what happens when a user
-   * holds an arrow key down. Writing here makes repeats accumulate; the
-   * render-time assignment still reconciles it with the store.
+   * `positionRef` is only refreshed once the store round-trip lands, so without
+   * the local write a burst of keydowns faster than React can re-render would
+   * all read the same stale value and collapse into a single step — exactly what
+   * happens when a user holds an arrow key down. Writing here makes repeats
+   * accumulate; the effect above still reconciles it with the store.
    */
   const commitPosition = useCallback(
     (next: number) => {
