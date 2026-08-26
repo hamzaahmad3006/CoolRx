@@ -66,7 +66,24 @@ export function LandCoverDonut({ features, size = 132 }: LandCoverDonutProps) {
   const inner = radius - stroke / 2;
   const circumference = 2 * Math.PI * inner;
 
-  let offset = 0;
+  // Each arc starts where the previous one ended. Accumulated up front rather
+  // than by advancing a counter inside the map below: that counter lived in the
+  // component body and was mutated while the JSX was being built, which makes
+  // the output depend on how many times React chooses to evaluate the render.
+  const arcs = all.reduce<{ slice: Slice; length: number; offset: number }[]>(
+    (drawn, slice) => {
+      const previous = drawn.at(-1);
+      return [
+        ...drawn,
+        {
+          slice,
+          length: (slice.pct / 100) * circumference,
+          offset: previous ? previous.offset + previous.length : 0,
+        },
+      ];
+    },
+    [],
+  );
 
   return (
     <div className="flex items-center gap-4">
@@ -92,24 +109,19 @@ export function LandCoverDonut({ features, size = 132 }: LandCoverDonutProps) {
         </defs>
 
         <g transform={`rotate(-90 ${radius} ${radius})`}>
-          {all.map((slice) => {
-            const length = (slice.pct / 100) * circumference;
-            const element = (
-              <circle
-                key={slice.key}
-                cx={radius}
-                cy={radius}
-                r={inner}
-                fill="none"
-                stroke={slice.measured ? slice.color : 'url(#lc-unmeasured)'}
-                strokeWidth={stroke}
-                strokeDasharray={`${length} ${circumference - length}`}
-                strokeDashoffset={-offset}
-              />
-            );
-            offset += length;
-            return element;
-          })}
+          {arcs.map(({ slice, length, offset }) => (
+            <circle
+              key={slice.key}
+              cx={radius}
+              cy={radius}
+              r={inner}
+              fill="none"
+              stroke={slice.measured ? slice.color : 'url(#lc-unmeasured)'}
+              strokeWidth={stroke}
+              strokeDasharray={`${length} ${circumference - length}`}
+              strokeDashoffset={-offset}
+            />
+          ))}
         </g>
       </svg>
 

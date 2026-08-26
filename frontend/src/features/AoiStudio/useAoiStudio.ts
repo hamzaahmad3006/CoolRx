@@ -93,8 +93,16 @@ export function useAoiStudio(): UseAoiStudioResult {
   const [centerLat, setCenterLat] = useState(DEFAULT_CENTER[1]);
   const [edgeKm, setEdgeKm] = useState(DEFAULT_EDGE_KM);
   const [buildLadder, setBuildLadder] = useState(true);
-  const [serverAreaSqMi, setServerAreaSqMi] = useState<number | null>(null);
-  const [serverIssues, setServerIssues] = useState<readonly AoiIssue[] | null>(null);
+  // The server's verdict is stored with the box it was computed for, so it can be
+  // matched against the current box during render instead of being cleared by an
+  // effect every time the box moves. That also drops a response the box has since
+  // moved past, which previously landed and overwrote the verdict for a box the
+  // user was no longer looking at.
+  const [serverVerdict, setServerVerdict] = useState<{
+    readonly box: BoundingBox;
+    readonly areaSqMi: number;
+    readonly issues: readonly AoiIssue[];
+  } | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const [validateAoi, validateState] = useValidateAoiMutation();
@@ -124,29 +132,34 @@ export function useAoiStudio(): UseAoiStudioResult {
   useEffect(() => {
     if (USE_FIXTURES) return undefined;
 
-    setServerIssues(null);
     const timer = window.setTimeout(() => {
       void validateAoi({ aoi: boxToFeatureCollection(box) as never })
         .unwrap()
         .then((result) => {
-          setServerAreaSqMi(result.areaSqMi);
-          setServerIssues(
-            result.violations.map((violation) => ({
+          setServerVerdict({
+            box,
+            areaSqMi: result.areaSqMi,
+            issues: result.violations.map((violation) => ({
               code: violation.code as AoiIssue['code'],
               message: violation.message,
               field: violation.field,
             })),
-          );
+          });
         })
         .catch(() => {
           // Leave the local verdict standing. A validation endpoint that is down
           // must not block placing an AOI; submission will surface the error.
-          setServerIssues(null);
         });
     }, VALIDATE_DEBOUNCE_MS);
 
     return () => window.clearTimeout(timer);
   }, [box, validateAoi]);
+
+  // `box` is memoised on the three inputs that define it, so identity is the
+  // right test: any move produces a new object and retires the stored verdict.
+  const confirmed = serverVerdict?.box === box ? serverVerdict : null;
+  const serverIssues = confirmed?.issues ?? null;
+  const serverAreaSqMi = confirmed?.areaSqMi ?? null;
 
   const issues = serverIssues ?? localIssues;
   const isValid = issues.length === 0;

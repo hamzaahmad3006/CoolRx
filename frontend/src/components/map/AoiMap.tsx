@@ -66,8 +66,13 @@ export function AoiMap({ box, isInvalid, onRecenter, className }: AoiMapProps) {
   const mapRef = useRef<MapLibreMap | null>(null);
   // Held in a ref so the click handler is registered once and never rebinds; a
   // handler recreated on every box change would leak listeners on each drag.
+  // Refreshed in an effect rather than during render: a ref is not a render
+  // input, so writing one while rendering makes the result depend on how many
+  // times React evaluates the component.
   const onRecenterRef = useRef(onRecenter);
-  onRecenterRef.current = onRecenter;
+  useEffect(() => {
+    onRecenterRef.current = onRecenter;
+  }, [onRecenter]);
 
   useEffect(() => {
     const container = containerRef.current;

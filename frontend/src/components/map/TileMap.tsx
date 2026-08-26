@@ -117,9 +117,13 @@ export function TileMap({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   // Held in a ref so the click handler is registered once but always sees the
-  // current callback.
+  // current callback. Refreshed in an effect rather than during render: a ref is
+  // not a render input, so writing one while rendering makes the result depend
+  // on how many times React evaluates the component.
   const onSelectRef = useRef(onSelectTile);
-  onSelectRef.current = onSelectTile;
+  useEffect(() => {
+    onSelectRef.current = onSelectTile;
+  }, [onSelectTile]);
 
   /* ── Initialise once ───────────────────────────────────────────────────── */
   useEffect(() => {

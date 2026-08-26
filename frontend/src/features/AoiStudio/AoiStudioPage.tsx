@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+
 import { AoiMap } from '@/components/map/AoiMap';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -281,9 +283,9 @@ export function AoiStudioPage() {
   return (
     <div className="flex h-dvh flex-col bg-background">
       <header className="flex shrink-0 items-baseline gap-3 border-b border-line bg-card px-5 py-3">
-        <a href="/" className="font-medium text-ink-primary hover:underline">
+        <Link href="/" className="font-medium text-ink-primary hover:underline">
           CoolRx
-        </a>
+        </Link>
         <span className="text-ink-muted" aria-hidden="true">
           /
         </span>
