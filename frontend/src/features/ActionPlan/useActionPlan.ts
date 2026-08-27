@@ -52,7 +52,12 @@ export function useActionPlan({ planId }: UseActionPlanArgs): UseActionPlanResul
     return provenanceQuery.data?.records ?? [];
   }, [provenanceQuery.data]);
 
-  const items = plan?.items ?? [];
+  // Memoised for the fallback's sake, not the property read. `?? []` builds a
+  // fresh array on every render whenever `plan` is null, and `items` is a
+  // dependency of both memos below -- so while a plan is loading, or absent, the
+  // rollup and the rationale count were recomputed on every single render and
+  // the memoisation around them did nothing.
+  const items = useMemo<readonly PlanItem[]>(() => plan?.items ?? [], [plan]);
 
   /**
    * Spend by intervention category.
