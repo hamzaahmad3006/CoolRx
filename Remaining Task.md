@@ -3,11 +3,13 @@
 Working document. Tasks are ordered by dependency, so doing them top-to-bottom
 avoids writing anything twice.
 
-**Last updated:** 2026-08-24 · **Target:** core complete 24 Aug, submit by 29 Aug ·
-**Tests:** 742 passing, 0 skipped with Postgres and Redis up
+**Last updated:** 2026-08-27 · **Target:** core complete ✅ 25 Aug, submit by 29 Aug ·
+**Tests:** 742 passing, 0 skipped with Postgres and Redis up · **CI:** green on `main`
 
 > Everything below the "Status at a glance" table is the older working log, kept
 > for its reasoning. Where it disagrees with this header, this header is right.
+> The table itself is current — it is the one part of this file below the header
+> that is maintained.
 
 ---
 
@@ -206,19 +208,30 @@ they are listed so nobody reopens them by accident.
 | Layer | Done | Remaining |
 |---|---|---|
 | Frontend pages | ✅ 10 of 10 + drawer | — |
-| Deployment | ✅ Makefile · both Dockerfiles · CI · compose web · demo script | ⚠️ no live URL yet |
+| Deployment | ✅ Makefile · both Dockerfiles · CI green on `main` · compose web · demo script | ⚠️ no live URL yet (AC-20) |
 | Backend persistence | ✅ complete | — |
-| Backend pipeline | ✅ all modules built | raster/census providers; training on real data |
-| Backend API surface | ✅ 20 routes wired | worker stages that call the pipeline |
-| Local env | ✅ `.venv` + all deps install | — |
+| Backend pipeline | ✅ all modules built and wired into the workers | — |
+| Backend API surface | ✅ 30 operations across 22 paths | — |
+| Local env | ✅ `.venv` on **3.12**, all deps install | — |
 | FortyGuard API | ✅ live, authenticated, parsed | — |
-| Data | ✅ fixtures, 3 districts, provenance, 15.4 MB | ⚠️ catalog 1 of 4 rows |
+| Model | ✅ trained on 3 districts, 11/13 features live | — |
+| Tests | ✅ 742 pass with services up · `ruff` clean · `eslint` clean · `tsc` clean | — |
+| Data | ✅ 45 recordings across six AOIs, provenance | catalog holds 2 of 2 defensible categories |
 
-**Critical path to a working demo:** B-2 is resolved — 14 real Phoenix fixtures are
-committed, so the pipeline runs offline. B-1 remains: the catalog holds one row, so
-the optimizer can only ever recommend street trees. After B-1, the geo providers
-(Task 3) are the largest remaining code task, and model training (Task 4) depends
-on them.
+**Critical path to a working demo:** every blocker below this line is now closed.
+B-2 went first (45 recordings committed), then B-1 — the catalog carries a second
+sourced row, so the optimizer has a real trade-off to make rather than one option
+to rank. The geo providers and model training that were named here as the largest
+remaining code tasks are both done.
+
+What is left is not code. AC-20 needs a Railway deployment, AC-19 needs
+`hackathon@fortyguard.com` added as a collaborator, and AC-24 needs the video.
+The one engineering item still open is AC-13: `FIXTURE_MODE=true` removes the
+FortyGuard calls, but the enrichment stage still fetches NLCD, 3DEP, ACS and
+Overpass live, so `make demo` needs the internet even though it needs no key.
+`data/features/*.json` already holds real provider output for all six AOIs;
+what stops that being wired as a fallback is that labelling a cached-feature run
+is a provenance decision, not a refactor.
 
 ---
 
