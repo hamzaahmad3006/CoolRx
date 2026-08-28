@@ -119,10 +119,15 @@ export function usePrescription({
   // `degraded` is a terminal state alongside `completed`, not a flag on it: a
   // plan whose narration failed still carries every number, and withholding it
   // would hide a complete result because its prose is missing.
-  const jobFinished = jobStatus === 'completed' || jobStatus === 'degraded';
+  const jobHasPlan = jobStatus === 'completed' || jobStatus === 'degraded';
+  // There are three terminal states, not two. `failed` leaves no plan behind,
+  // but it is every bit as final -- and treating it as unfinished left the
+  // button reading "Optimising…" for as long as the page stayed open, on a job
+  // that had already stopped seconds earlier with its reason recorded.
+  const jobSettled = jobHasPlan || jobStatus === 'failed';
 
   const plansQuery = useListPlansQuery(projectId, {
-    skip: USE_FIXTURES || !jobFinished,
+    skip: USE_FIXTURES || !jobHasPlan,
   });
 
   const plan: Plan | null = useMemo(() => {
@@ -180,10 +185,17 @@ export function usePrescription({
     [dispatch],
   );
 
+  // The worker's own sentence, in preference to a generic notice. "No
+  // intervention is both feasible and beneficial on any block in this area"
+  // tells a planner something true about their district -- that nothing here
+  // crosses the threshold -- where "the service may be unavailable" would send
+  // them to look for a fault that does not exist.
+  const jobError = jobStatus === 'failed' ? (jobQuery.data?.error ?? null) : null;
   const errorMessage =
-    createState.isError || planQuery.isError
+    jobError ??
+    (createState.isError || planQuery.isError
       ? 'We couldn’t generate a plan. The analysis service may be unavailable.'
-      : null;
+      : null);
 
   return {
     plan,
@@ -192,7 +204,7 @@ export function usePrescription({
     // Reporting it done when the request returned would let a second click
     // queue a duplicate optimisation of the same project.
     isOptimizing:
-      createState.isLoading || (jobId !== null && !jobFinished),
+      createState.isLoading || (jobId !== null && !jobSettled),
     errorMessage,
     budgetUsd,
     objective,

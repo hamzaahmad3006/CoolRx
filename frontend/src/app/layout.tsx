@@ -63,7 +63,20 @@ export default function RootLayout({ children }: RootLayoutProps) {
       className={`${inter.variable} ${jetBrainsMono.variable} ${sourceSerif.variable}`}
       suppressHydrationWarning
     >
-      <body className="min-h-screen bg-canvas text-ink antialiased">
+      {/*
+        `suppressHydrationWarning` on `body` for the same reason it is on `html`:
+        extensions edit both before React attaches. Password managers and reader
+        tools stamp an attribute on `body` — `__processed_<uuid>__="true"`, with a
+        fresh uuid each load — and React reports the mismatch as a hydration
+        error on every page. The warning is real but the cause is outside the
+        app, and leaving it in place trains the reader to ignore the console,
+        where a genuine mismatch would then also go unread. This suppresses
+        attribute noise on this one element only; children still hydrate strictly.
+      */}
+      <body
+        className="min-h-screen bg-canvas text-ink antialiased"
+        suppressHydrationWarning
+      >
         <Providers>{children}</Providers>
       </body>
     </html>
