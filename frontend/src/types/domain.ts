@@ -12,7 +12,7 @@ import type {
   FgGranularity,
   FgFilterType,
   FgFeatureCollection,
-  FgStatsData,
+  FgStatsFlat,
   FgTileProperties,
   FgUnits,
 } from './fortyguard';
@@ -119,7 +119,13 @@ export interface AnalyticRun {
   readonly filterType: FgFilterType;
   /** Read from the API response, never assumed. Null if the response omitted it. */
   readonly units: FgUnits | null;
-  readonly stats: FgStatsData;
+  /**
+   * Already flattened by the backend, not the API's raw `stats_data`.
+   * `analytic_run_to_response` publishes `stats_of_run(...)`, which reads both
+   * response shapes and emits this one — so reading it through `fgStat`, which
+   * looks for a nested `Temperature_stats` block, finds nothing.
+   */
+  readonly stats: FgStatsFlat;
   /** FortyGuard handle — the provenance anchor. Null for a fixture-backed run. */
   readonly activityId: string | null;
   readonly createdAt: string;
