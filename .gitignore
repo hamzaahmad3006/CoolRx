@@ -20,6 +20,12 @@ venv/
 
 # ── Secrets — never commit ──────────────────────────────────────────────────
 .env
+# Backups and drafts of it too. `.env` matches only that exact name, so a
+# `.env.bak-1787893615` written beside it sat untracked and would have gone
+# in with the next `git add -A`, carrying every live key with it.
+.env.bak*
+.env.backup*
+.env.save*
 .env.local
 .env.*.local
 !.env.example
