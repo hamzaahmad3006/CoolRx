@@ -150,7 +150,14 @@ class PlanNarrator:
         final: GraphState = graph.invoke(initial)  # type: ignore[assignment]
 
         result = AgentRunResult(
-            run_id=f"run_{uuid.uuid4().hex[:8]}",
+            # A real UUID, not a prefixed short id. This value becomes the
+            # primary key of `agent_runs` and the `{run_id}` in
+            # `/api/agent/runs/{run_id}/trace`, both of which are typed UUID --
+            # so `run_abc12345` made `uuid.UUID(...)` raise in
+            # `plan_pipeline`, where the failure was swallowed as "the trace is
+            # not worth a failed plan". The run was never persisted, and the
+            # Agent Trace screen answered 404 blaming an unconfigured LLM.
+            run_id=str(uuid.uuid4()),
             plan_id=plan_id,
             graph_version=GRAPH_VERSION,
             model=self._client.model_name,

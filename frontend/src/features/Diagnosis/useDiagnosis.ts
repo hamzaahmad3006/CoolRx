@@ -202,7 +202,22 @@ export function useDiagnosis({
         units: null,
       };
     }
-    const flat = statsQuery.data?.stats;
+    // `/stats` publishes a project-level summary *and* one run per analytic.
+    // The summary is the temperature field, so using it on every tab put the
+    // tcm figures under the wrong unit everywhere else: a district measured at
+    // 34.63 °C rendered as "35 hours" of unbroken heat on Persistence, which is
+    // not merely wrong but impossible. The per-analytic block was already in
+    // the payload; this reads it.
+    //
+    // Exceedance is queried once per rung, so the run matching the threshold
+    // the legend names is the one whose figures belong beside it.
+    const run = statsQuery.data?.analyticRuns.find(
+      (candidate) =>
+        candidate.analyticType === activeAnalytic &&
+        (activeAnalytic !== 'exceedance' ||
+          candidate.thresholdC === FIXTURE_THRESHOLD_C),
+    );
+    const flat = run?.stats ?? statsQuery.data?.stats;
     if (flat === undefined) return null;
     return {
       min: flat.min ?? null,

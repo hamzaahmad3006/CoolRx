@@ -401,18 +401,26 @@ def _narrate(
     # assertion. A failed verdict is recorded exactly like a clean one; keeping
     # only the passes would make the trace a highlight reel.
     try:
-        from dataclasses import asdict
-
         from repositories.agent import AgentRunRepository
 
+        # `model_dump`, not `dataclasses.asdict`. `AgentNodeRecord` and
+        # `GuardViolation` are `ApiModel`s -- Pydantic, not dataclasses -- so
+        # `asdict` raised "asdict() should be called on dataclass instances" and
+        # the whole block was swallowed by the handler below. mypy had reported
+        # both call sites for some time; the finding was true and unread because
+        # the job is `continue-on-error` in CI.
+        #
+        # `mode="json"` because these land in a JSONB column: it renders any
+        # enum or datetime to something the driver can serialise, rather than
+        # failing at flush with a value Python could hold but Postgres could not.
         AgentRunRepository(plans.session).record(
             run_id=uuid.UUID(run.run_id),
             plan_id=uuid.UUID(run.plan_id),
             graph_version=run.graph_version,
             model=run.model,
-            nodes=[asdict(node) for node in run.nodes],
+            nodes=[node.model_dump(mode="json") for node in run.nodes],
             guard_verdict=run.verdict,
-            guard_violations=[asdict(v) for v in run.violations],
+            guard_violations=[v.model_dump(mode="json") for v in run.violations],
             tokens_in=run.tokens_in,
             tokens_out=run.tokens_out,
             duration_ms=run.duration_ms,
