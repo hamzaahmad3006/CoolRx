@@ -140,31 +140,46 @@ export function PrescriptionPage({
         </header>
 
         {/* ── Control strip ─────────────────────────────────────────────── */}
-        <section className="grid grid-cols-1 items-end gap-6 rounded-sharp border border-line bg-card p-5 lg:grid-cols-[1fr_auto_1fr_auto]">
-          <BudgetSlider value={budgetUsd} onChange={onBudgetChange} />
-
-          <div className="flex flex-col gap-2">
+        {/*
+          The action sits on its own row above the inputs rather than as a
+          fourth column beside them. Four columns left it the narrowest thing in
+          the row, so it was the first to be squeezed — the label broke in two
+          and spilled out of the card. On its own row it keeps its width at any
+          viewport, and the reading order matches the sentence the page makes:
+          this is what the control does, and these are the constraints it uses.
+        */}
+        <section className="flex flex-col gap-5 rounded-sharp border border-line bg-card p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <span className="text-eyebrow uppercase tracking-[0.08em] text-ink-secondary">
-              Objective function
+              Constraints
             </span>
-            <SegmentedControl
-              label="Optimisation objective"
-              options={OBJECTIVE_OPTIONS}
-              value={objective}
-              onChange={onObjectiveChange}
-            />
+            <Button
+              variant="primary"
+              icon="optimize"
+              onClick={onOptimize}
+              disabled={isOptimizing}
+            >
+              {isOptimizing ? 'Optimising…' : 'Optimize plan'}
+            </Button>
           </div>
 
-          <EquityLambdaSlider value={equityLambda} onChange={onEquityLambdaChange} />
+          <div className="grid grid-cols-1 items-end gap-6 lg:grid-cols-[1fr_auto_1fr]">
+            <BudgetSlider value={budgetUsd} onChange={onBudgetChange} />
 
-          <Button
-            variant="primary"
-            icon="optimize"
-            onClick={onOptimize}
-            disabled={isOptimizing}
-          >
-            {isOptimizing ? 'Optimising…' : 'Optimize plan'}
-          </Button>
+            <div className="flex flex-col gap-2">
+              <span className="text-eyebrow uppercase tracking-[0.08em] text-ink-secondary">
+                Objective function
+              </span>
+              <SegmentedControl
+                label="Optimisation objective"
+                options={OBJECTIVE_OPTIONS}
+                value={objective}
+                onChange={onObjectiveChange}
+              />
+            </div>
+
+            <EquityLambdaSlider value={equityLambda} onChange={onEquityLambdaChange} />
+          </div>
         </section>
 
         {errorMessage !== null ? (
