@@ -61,7 +61,7 @@ function toGeoJson(tiles: TileCollection): SwipeGeoJson {
       return {
         type: 'Feature' as const,
         properties: {
-          tile_key: feature.properties.tile_key,
+          tile_key: feature.properties.tileKey,
           value: feature.properties.value,
           cx,
         },

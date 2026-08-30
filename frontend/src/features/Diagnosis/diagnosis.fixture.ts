@@ -153,7 +153,7 @@ export function fixtureTiles(analytic: FgAnalyticType): TileCollection {
     features: TILES.map((tile) => ({
       type: 'Feature' as const,
       properties: {
-        tile_key: tile.tileKey,
+        tileKey: tile.tileKey,
         value: valueFor(tile, analytic),
       },
       geometry: {

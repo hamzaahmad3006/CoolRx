@@ -80,7 +80,12 @@ function toMapLibreGeoJson(tiles: TileCollection): TileGeoJson {
     features: tiles.features.map((feature) => ({
       type: 'Feature',
       properties: {
-        tile_key: feature.properties.tile_key,
+        // `tileKey`, not `tile_key`. The API serialises camelCase, so the
+        // snake_case read was always `undefined`: every feature reached the map
+        // without an identity, the selection layer's `['get','tile_key']` filter
+        // matched nothing, and clicking a block selected nothing. The domain
+        // type declared `tile_key`, which is what kept the mistake type-checking.
+        tile_key: feature.properties.tileKey,
         value: feature.properties.value,
       },
       geometry: {
