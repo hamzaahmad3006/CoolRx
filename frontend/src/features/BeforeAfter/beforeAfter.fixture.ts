@@ -85,7 +85,7 @@ function toCollection(
     features: WITH_DELTA.map((tile) => ({
       type: 'Feature' as const,
       properties: {
-        tile_key: tile.record.tileKey,
+        tileKey: tile.record.tileKey,
         value: pick(tile),
       },
       geometry: {

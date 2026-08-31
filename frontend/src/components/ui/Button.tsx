@@ -39,8 +39,12 @@ export function Button({
       type={type}
       disabled={disabled}
       className={cn(
-        'inline-flex h-9 items-center justify-center gap-2 rounded-sharp px-4',
-        'text-caption font-medium transition-colors',
+        // `whitespace-nowrap` and `shrink-0`: a label is not a paragraph. In a
+        // tight flex row "Optimize plan" broke across two lines and then spilled
+        // out of the fixed `h-9`, so the button rendered outside its own card.
+        // `min-h-9` keeps the height where it was without capping it.
+        'inline-flex min-h-9 shrink-0 items-center justify-center gap-2 rounded-sharp px-4',
+        'whitespace-nowrap text-caption font-medium transition-colors',
         'disabled:cursor-not-allowed disabled:opacity-50',
         VARIANT_CLASSES[variant],
         className,

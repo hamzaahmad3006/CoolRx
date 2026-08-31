@@ -136,12 +136,12 @@ export function useBeforeAfter({
     const baseline = new Map<string, number>();
     before.features.forEach((f) => {
       const value = f.properties.value;
-      if (value !== null) baseline.set(f.properties.tile_key, value);
+      if (value !== null) baseline.set(f.properties.tileKey, value);
     });
     const out: number[] = [];
     after.features.forEach((f) => {
       const post = f.properties.value;
-      const pre = baseline.get(f.properties.tile_key);
+      const pre = baseline.get(f.properties.tileKey);
       if (post !== null && pre !== undefined) out.push(post - pre);
     });
     return out;

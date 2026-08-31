@@ -190,6 +190,44 @@ export function useDiagnosis({
     };
   }, [activeAnalytic, tilesQuery.data]);
 
+  /**
+   * Centre the map on the tiles that were actually measured.
+   *
+   * This used to return `DIAGNOSIS_CENTER` for every project — a constant from
+   * the fixture module, fixed at 33.4755 °N. Central Phoenix measures 33.43 to
+   * 33.455, so the viewport sat two kilometres north of its own data and the
+   * district rendered off-screen: an empty grey panel with a correct legend and
+   * a correct block count beside it. For Las Vegas and Tucson it was hundreds of
+   * kilometres out.
+   *
+   * The bounds come from the geometry rather than the project's AOI because the
+   * tiles are what is drawn, and a grid is clipped to whole cells.
+   */
+  const center = useMemo<readonly [number, number]>(() => {
+    const features = tiles?.features ?? [];
+    if (features.length === 0) return DIAGNOSIS_CENTER;
+
+    let west = Infinity;
+    let east = -Infinity;
+    let south = Infinity;
+    let north = -Infinity;
+
+    for (const feature of features) {
+      for (const ring of feature.geometry.coordinates) {
+        for (const position of ring) {
+          const [lon, lat] = position;
+          if (lon < west) west = lon;
+          if (lon > east) east = lon;
+          if (lat < south) south = lat;
+          if (lat > north) north = lat;
+        }
+      }
+    }
+
+    if (!Number.isFinite(west) || !Number.isFinite(south)) return DIAGNOSIS_CENTER;
+    return [(west + east) / 2, (south + north) / 2];
+  }, [tiles]);
+
   const stats = useMemo<DistrictStats | null>(() => {
     if (USE_FIXTURES) {
       const blob = fixtureStats(activeAnalytic);
@@ -341,7 +379,7 @@ export function useDiagnosis({
     districtPeakHourLocal,
     tileCount: USE_FIXTURES ? FIXTURE_TILE_COUNT : (tilesQuery.data?.tileCount ?? 0),
     thresholdC: USE_FIXTURES ? FIXTURE_THRESHOLD_C : thresholdC,
-    center: DIAGNOSIS_CENTER,
+    center,
     selectedTileKey,
     isLoading: tilesQuery.isLoading || statsQuery.isLoading,
     errorMessage,

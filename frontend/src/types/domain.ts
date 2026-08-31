@@ -138,7 +138,14 @@ export interface Tile {
   readonly value: number | null;
 }
 
-export type TileCollection = FgFeatureCollection<FgTileProperties & { readonly tile_key: string }>;
+export type TileCollection = FgFeatureCollection<
+  FgTileProperties & {
+    /** camelCase, as the API serialises it. Declared `tile_key` here for a
+     *  long while, which let a snake_case read type-check and return
+     *  `undefined` for every tile. */
+    readonly tileKey: string;
+  }
+>;
 
 /* ═════════════════════════════════════════════════════════════════════════════
  * ENRICHMENT — land cover, exposure, attribution
